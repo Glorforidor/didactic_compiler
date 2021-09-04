@@ -2,11 +2,18 @@
 // language of the didactic compiler.
 package ast
 
-import "github.com/Glorforidor/didactic_compiler/token"
+import (
+	"strings"
+
+	"github.com/Glorforidor/didactic_compiler/token"
+)
 
 type Node interface {
 	// TokenLiteral is used for debugging and testing purpose.
 	TokenLiteral() string
+
+	// String stringifies a nodes structure.
+	String() string
 }
 
 type Statement interface {
@@ -38,6 +45,16 @@ func (p *Program) TokenLiteral() string {
 	return ""
 }
 
+func (p *Program) String() string {
+	var sb strings.Builder
+
+	for _, s := range p.Statements {
+		sb.WriteString(s.String())
+	}
+
+	return sb.String()
+}
+
 type PrintStatement struct {
 	Token token.Token // The token.Print token.
 	Value Expression
@@ -45,3 +62,20 @@ type PrintStatement struct {
 
 func (ps *PrintStatement) statementNode()       {}
 func (ps *PrintStatement) TokenLiteral() string { return ps.Token.Literal }
+func (ps *PrintStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(ps.TokenLiteral() + " ")
+	sb.WriteString(ps.Value.String())
+
+	return sb.String()
+}
+
+type IntegerLiteral struct {
+	Token token.Token // The token.Int token.
+	Value int64
+}
+
+func (il *IntegerLiteral) expressionNode()      {}
+func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
+func (il *IntegerLiteral) String() string       { return il.Token.Literal }

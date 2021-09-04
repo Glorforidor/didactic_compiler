@@ -1,9 +1,22 @@
 package parser
 
 import (
+	"strconv"
+
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/lexer"
 	"github.com/Glorforidor/didactic_compiler/token"
+)
+
+type (
+	prefixParseFunc func() ast.Expression
+	infixParseFunc  func(ast.Expression) ast.Expression
+)
+
+// Precendence table
+const (
+	_ int = iota
+	Lowest
 )
 
 type Parser struct {
@@ -11,10 +24,19 @@ type Parser struct {
 
 	curToken  token.Token
 	peekToken token.Token
+
+	// Pratt parsing maps token types with parsing functions.
+	prefixParseFuncs map[token.TokenType]prefixParseFunc
+	infixParseFuncs  map[token.TokenType]infixParseFunc
 }
 
 func New(l *lexer.Lexer) *Parser {
-	p := &Parser{l: l}
+	p := &Parser{
+		l:                l,
+		prefixParseFuncs: make(map[token.TokenType]prefixParseFunc),
+	}
+
+	p.registerPrefixFunc(token.Int, p.parseIntegerLiteral)
 
 	// Prime the parser, so curToken and peekToken are in the right positions.
 	p.nextToken()
@@ -26,6 +48,14 @@ func New(l *lexer.Lexer) *Parser {
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
+}
+
+func (p *Parser) registerPrefixFunc(tt token.TokenType, f prefixParseFunc) {
+	p.prefixParseFuncs[tt] = f
+}
+
+func (p *Parser) registerInfixFunc(tt token.TokenType, f infixParseFunc) {
+	p.infixParseFuncs[tt] = f
 }
 
 // ParseProgram parses the source language for the didactic compiler into an
@@ -56,5 +86,34 @@ func (p *Parser) parseStatement() ast.Statement {
 func (p *Parser) parsePrintStatement() *ast.PrintStatement {
 	stmt := &ast.PrintStatement{Token: p.curToken} // p.curtoken = "print"
 
+	p.nextToken() // advance to the literal
+
+	stmt.Value = p.parseExpression(Lowest)
+
 	return stmt
+}
+
+// parseExpression is the heart of the Pratt parsing.
+func (p *Parser) parseExpression(precedence int) ast.Expression {
+	prefix := p.prefixParseFuncs[p.curToken.Type]
+	if prefix == nil {
+		return nil
+	}
+	leftExp := prefix()
+
+	return leftExp
+}
+
+func (p *Parser) parseIntegerLiteral() ast.Expression {
+	lit := &ast.IntegerLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+	if err != nil {
+		// TODO: handle parsing error
+		return nil
+	}
+
+	lit.Value = value
+
+	return lit
 }

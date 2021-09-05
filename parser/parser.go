@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
@@ -19,8 +20,11 @@ const (
 	Lowest
 )
 
+// Parser holds the parser's internal state.
 type Parser struct {
 	l *lexer.Lexer
+
+	errors []string
 
 	curToken  token.Token
 	peekToken token.Token
@@ -56,6 +60,10 @@ func (p *Parser) registerPrefixFunc(tt token.TokenType, f prefixParseFunc) {
 
 func (p *Parser) registerInfixFunc(tt token.TokenType, f infixParseFunc) {
 	p.infixParseFuncs[tt] = f
+}
+
+func (p *Parser) Errors() []string {
+	return p.errors
 }
 
 // ParseProgram parses the source language for the didactic compiler into an
@@ -97,6 +105,11 @@ func (p *Parser) parsePrintStatement() *ast.PrintStatement {
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefix := p.prefixParseFuncs[p.curToken.Type]
 	if prefix == nil {
+		msg := fmt.Sprintf(
+			"no prefix parse function attached to token %s found",
+			p.curToken.Type,
+		)
+		p.errors = append(p.errors, msg)
 		return nil
 	}
 	leftExp := prefix()
@@ -109,7 +122,8 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 	if err != nil {
-		// TODO: handle parsing error
+		msg := fmt.Sprintf("could not parse %q as an integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
 		return nil
 	}
 

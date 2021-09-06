@@ -11,6 +11,7 @@ const (
 	// Literals
 	Int    TokenType = "INT"    // 0123456789
 	String TokenType = "STRING" // "hello world"
+	Float  TokenType = "FLOAT"  // 0.123456789
 
 	// Keywords
 	Print TokenType = "PRINT"

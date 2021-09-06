@@ -53,8 +53,7 @@ func (l *Lexer) NextToken() token.Token {
 			// return early so we do not advance further.
 			return tok
 		} else if isDigit(l.ch) {
-			tok.Literal = l.readNumber()
-			tok.Type = token.Int
+			tok = l.readNumber()
 
 			// readNumber advances read positions, and therefore we must
 			// return early so we do not advance further.
@@ -69,6 +68,15 @@ func (l *Lexer) NextToken() token.Token {
 	l.readChar()
 
 	return tok
+}
+
+// peek peeks one character ahead in l.input.
+func (l *Lexer) peek() byte {
+	if l.readPosition >= len(l.input) {
+		return eof
+	}
+
+	return l.input[l.readPosition]
 }
 
 // isLetter check whether ch is a letter. It includes "_" as a letter.
@@ -96,13 +104,29 @@ func (l *Lexer) readIdentifier() string {
 }
 
 // readNumber reads an number from l.input.
-func (l *Lexer) readNumber() string {
+func (l *Lexer) readNumber() token.Token {
+	var tok token.Token
+	tok.Type = token.Int
+
 	position := l.position
+
 	for isDigit(l.ch) {
 		l.readChar()
 	}
 
-	return l.input[position:l.position]
+	if l.ch == '.' && isDigit(l.peek()) {
+		tok.Type = token.Float
+
+		l.readChar() // advance beyond the "."
+
+		for isDigit(l.ch) {
+			l.readChar()
+		}
+	}
+
+	tok.Literal = l.input[position:l.position]
+
+	return tok
 }
 
 // readString reads a string from l.input.

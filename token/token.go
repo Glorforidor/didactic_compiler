@@ -9,7 +9,8 @@ const (
 	Eof     TokenType = "EOF"
 
 	// Literals
-	Int TokenType = "INT" // 0123456789
+	Int    TokenType = "INT"    // 0123456789
+	String TokenType = "STRING" // "hello world"
 
 	// Keywords
 	Print TokenType = "PRINT"

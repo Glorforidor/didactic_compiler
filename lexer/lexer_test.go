@@ -7,7 +7,10 @@ import (
 )
 
 func TestNextToken(t *testing.T) {
-	input := `print 42`
+	input := `
+	print 42
+	print "hello world"
+`
 
 	tests := []struct {
 		expectedType    token.TokenType
@@ -15,6 +18,8 @@ func TestNextToken(t *testing.T) {
 	}{
 		{token.Print, "print"},
 		{token.Int, "42"},
+		{token.Print, "print"},
+		{token.String, "hello world"},
 		{token.Eof, ""},
 	}
 

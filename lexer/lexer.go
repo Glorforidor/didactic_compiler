@@ -6,8 +6,6 @@ import (
 	"github.com/Glorforidor/didactic_compiler/token"
 )
 
-const eof byte = 0
-
 type Lexer struct {
 	input        string
 	position     int  // current position in input (points to current char)
@@ -33,11 +31,16 @@ func (l *Lexer) readChar() {
 	l.readPosition += 1
 }
 
+const eof byte = 0
+
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
 	var tok token.Token
 	switch l.ch {
+	case '"':
+		tok.Type = token.String
+		tok.Literal = l.readString()
 	case eof:
 		tok.Literal = ""
 		tok.Type = token.Eof
@@ -92,6 +95,7 @@ func (l *Lexer) readIdentifier() string {
 	return l.input[position:l.position]
 }
 
+// readNumber reads an number from l.input.
 func (l *Lexer) readNumber() string {
 	position := l.position
 	for isDigit(l.ch) {
@@ -101,9 +105,26 @@ func (l *Lexer) readNumber() string {
 	return l.input[position:l.position]
 }
 
+// readString reads a string from l.input.
+func (l *Lexer) readString() string {
+	// readPosition is right after the '"' so inside the string.
+	position := l.readPosition
+
+	for {
+		l.readChar()
+
+		// TODO: consider if eof is reached the string is malformed.
+		if l.ch == '"' || l.ch == eof {
+			break
+		}
+	}
+
+	return l.input[position:l.position]
+}
+
 func (l *Lexer) skipWhiteSpace() {
 	// keep advancing the input positions until hitting a non whitespace
-	// character
+	// character.
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 		l.readChar()
 	}

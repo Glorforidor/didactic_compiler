@@ -41,6 +41,7 @@ func New(l *lexer.Lexer) *Parser {
 	}
 
 	p.registerPrefixFunc(token.Int, p.parseIntegerLiteral)
+	p.registerPrefixFunc(token.String, p.parseStringLiteral)
 
 	// Prime the parser, so curToken and peekToken are in the right positions.
 	p.nextToken()
@@ -130,4 +131,8 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	lit.Value = value
 
 	return lit
+}
+
+func (p *Parser) parseStringLiteral() ast.Expression {
+	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
 }

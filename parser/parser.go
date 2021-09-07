@@ -41,6 +41,7 @@ func New(l *lexer.Lexer) *Parser {
 	}
 
 	p.registerPrefixFunc(token.Int, p.parseIntegerLiteral)
+	p.registerPrefixFunc(token.Float, p.parseFloatLiteral)
 	p.registerPrefixFunc(token.String, p.parseStringLiteral)
 
 	// Prime the parser, so curToken and peekToken are in the right positions.
@@ -124,6 +125,21 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as an integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
+	lit.Value = value
+
+	return lit
+}
+
+func (p *Parser) parseFloatLiteral() ast.Expression {
+	lit := &ast.FloatLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseFloat(p.curToken.Literal, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as a float", p.curToken.Literal)
 		p.errors = append(p.errors, msg)
 		return nil
 	}

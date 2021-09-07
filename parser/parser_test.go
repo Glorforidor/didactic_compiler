@@ -33,6 +33,7 @@ func TestPrintStatement(t *testing.T) {
 	}{
 		{`print 42`, 42},
 		{`print "hello world"`, "hello world"},
+		{`print 0.123456789`, 0.123456789},
 	}
 
 	for _, tt := range tests {
@@ -74,11 +75,14 @@ func testLiteralExpression(
 	expected interface{},
 ) {
 	t.Helper()
+
 	switch v := expected.(type) {
 	case int:
 		testIntegerLiteral(t, exp, int64(v))
 	case int64:
 		testIntegerLiteral(t, exp, v)
+	case float64:
+		testFloatLiteral(t, exp, v)
 	case string:
 		testStringLiteral(t, exp, v)
 	default:
@@ -88,9 +92,10 @@ func testLiteralExpression(
 
 func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) {
 	t.Helper()
+
 	integer, ok := il.(*ast.IntegerLiteral)
 	if !ok {
-		t.Fatalf("il is not an *ast.IntegerLiteral. Got=%T", il)
+		t.Fatalf("il is not an *ast.IntegerLiteral. got=%T", il)
 	}
 
 	if integer.Value != value {
@@ -102,7 +107,28 @@ func testIntegerLiteral(t *testing.T, il ast.Expression, value int64) {
 	}
 }
 
+func testFloatLiteral(t *testing.T, fl ast.Expression, value float64) {
+	t.Helper()
+
+	float, ok := fl.(*ast.FloatLiteral)
+	if !ok {
+		t.Fatalf("fl is not an *ast.FloatLiteral. got=%f", fl)
+	}
+
+	if float.Value != value {
+		t.Fatalf("float.Value is not %f. got=%f", value, float.Value)
+	}
+
+	// XXX: the float formatting needs to match exactly number digits in the
+	// fractional.
+	if float.TokenLiteral() != fmt.Sprintf("%.9f", value) {
+		t.Fatalf("float.TokenLiteral is not %.9f. got=%s", value, float.TokenLiteral())
+	}
+}
+
 func testStringLiteral(t *testing.T, sl ast.Expression, value string) {
+	t.Helper()
+
 	str, ok := sl.(*ast.StringLiteral)
 	if !ok {
 		t.Fatalf("sl is not an *ast.StringLiteral. got=%T", sl)

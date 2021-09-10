@@ -11,6 +11,7 @@ type Compiler struct {
 	code []string
 
 	registerTable registerTable
+	label         label
 }
 
 func New() *Compiler {
@@ -53,8 +54,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			printType = 4
 		}
 
-		code := fmt.Sprintf("li a7, %d", printType)
-		c.emit(code, "ecall")
+		code := []string{
+			fmt.Sprintf("li a7, %d", printType),
+			"ecall",
+		}
+		c.emit(code...)
 
 		c.registerTable.dealloc(node.Value.Register())
 	case *ast.IntegerLiteral:
@@ -70,6 +74,24 @@ func (c *Compiler) Compile(node ast.Node) error {
 			node.Value,
 		)
 		c.emit(code)
+	case *ast.StringLiteral:
+		reg, err := c.registerTable.alloc()
+		if err != nil {
+			return err
+		}
+
+		node.Reg = reg
+		c.label.Create()
+
+		code := []string{
+			".data",
+			fmt.Sprintf("%s:", c.label.Name()),
+			fmt.Sprintf(".string %q", node.Value),
+			".text",
+			fmt.Sprintf("la %s, %s", c.registerTable.name(node.Reg), c.label.Name()),
+		}
+
+		c.emit(code...)
 	default:
 		return fmt.Errorf("unknown type: %#v", node)
 	}

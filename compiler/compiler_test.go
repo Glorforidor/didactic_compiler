@@ -35,6 +35,34 @@ li a0, 43
 li a7, 1
 ecall`,
 		},
+		{
+			input: `print "Hello World"`,
+			expected: `.data
+.L1:
+.string "Hello World"
+.text
+la a0, .L1
+li a7, 4
+ecall`,
+		},
+		{
+			input: `print "Hello World"
+print "Hello Peeps"`,
+			expected: `.data
+.L1:
+.string "Hello World"
+.text
+la a0, .L1
+li a7, 4
+ecall
+.data
+.L2:
+.string "Hello Peeps"
+.text
+la a0, .L2
+li a7, 4
+ecall`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -48,7 +76,7 @@ ecall`,
 
 		asm := comp.Asm()
 		if asm != tt.expected {
-			t.Fatalf("wrong assembly emitted.\nexpected=%q\ngot=%q", tt.expected, asm)
+			t.Fatalf("wrong assembly emitted.\nexpected=\n%q\ngot=\n%q", tt.expected, asm)
 		}
 	}
 }

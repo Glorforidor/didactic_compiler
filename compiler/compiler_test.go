@@ -63,6 +63,16 @@ la a0, .L2
 li a7, 4
 ecall`,
 		},
+		{
+			input: `print 42.1`,
+			expected: `.data
+.L1:
+.double 42.1
+.text
+fld fa0, .L1, a0
+li a7, 3
+ecall`,
+		},
 	}
 
 	for _, tt := range tests {

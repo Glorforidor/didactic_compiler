@@ -68,12 +68,33 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		node.Reg = reg
-		code := fmt.Sprintf(
-			"li %s, %d",
-			c.registerTable.name(node.Reg),
-			node.Value,
-		)
-		c.emit(code)
+		code := []string{
+			fmt.Sprintf("li %s, %d", c.registerTable.name(node.Reg), node.Value),
+		}
+		c.emit(code...)
+	case *ast.FloatLiteral:
+		reg, err := c.registerTable.alloc()
+		if err != nil {
+			return err
+		}
+
+		// TODO: Should probably have a allocate floating point register func.
+		node.Reg = reg
+
+		// create a label for the floating point
+		// TODO: maybe it would be nice to have different names for labels
+		// after their type.
+		c.label.Create()
+
+		code := []string{
+			".data",
+			fmt.Sprintf("%s:", c.label.Name()),
+			fmt.Sprintf(".double %g", node.Value),
+			".text",
+			// TODO: Change the below to allocate a float register
+			fmt.Sprintf("fld fa0, %s, %s", c.label.Name(), c.registerTable.name(reg)), 
+		}
+		c.emit(code...)
 	case *ast.StringLiteral:
 		reg, err := c.registerTable.alloc()
 		if err != nil {

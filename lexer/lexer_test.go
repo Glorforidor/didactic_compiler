@@ -11,6 +11,7 @@ func TestNextToken(t *testing.T) {
 	print 42
 	print "hello world"
 	print 0.42
+	-/*+
 `
 
 	tests := []struct {
@@ -23,6 +24,10 @@ func TestNextToken(t *testing.T) {
 		{token.String, "hello world"},
 		{token.Print, "print"},
 		{token.Float, "0.42"},
+		{token.Minus, "-"},
+		{token.Slash, "/"},
+		{token.Asterisk, "*"},
+		{token.Plus, "+"},
 		{token.Eof, ""},
 	}
 

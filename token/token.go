@@ -13,6 +13,12 @@ const (
 	String TokenType = "STRING" // "hello world"
 	Float  TokenType = "FLOAT"  // 0.123456789
 
+	// Operators
+	Plus     TokenType = "+"
+	Minus    TokenType = "-"
+	Asterisk TokenType = "*"
+	Slash    TokenType = "/"
+
 	// Keywords
 	Print TokenType = "PRINT"
 )

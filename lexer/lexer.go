@@ -33,17 +33,29 @@ func (l *Lexer) readChar() {
 
 const eof byte = 0
 
+func newToken(tokenType token.TokenType, ch byte) token.Token {
+	return token.Token{Type: tokenType, Literal: string(ch)}
+}
+
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
 	var tok token.Token
 	switch l.ch {
+	case '+':
+		tok = newToken(token.Plus, l.ch)
+	case '-':
+		tok = newToken(token.Minus, l.ch)
+	case '*':
+		tok = newToken(token.Asterisk, l.ch)
+	case '/':
+		tok = newToken(token.Slash, l.ch)
 	case '"':
 		tok.Type = token.String
 		tok.Literal = l.readString()
 	case eof:
-		tok.Literal = ""
 		tok.Type = token.Eof
+		tok.Literal = ""
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()

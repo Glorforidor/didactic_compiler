@@ -43,10 +43,6 @@ func TestPrintStatement(t *testing.T) {
 		program := p.ParseProgram()
 		checkParserError(t, p)
 
-		if program == nil {
-			t.Fatalf("ParseProgram() returned nil")
-		}
-
 		if len(program.Statements) != 1 {
 			t.Fatalf("program.Statements does not contain 1 statement. got=%d", len(program.Statements))
 		}

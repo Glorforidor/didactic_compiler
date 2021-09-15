@@ -14,13 +14,6 @@ type (
 	infixParseFunc  func(ast.Expression) ast.Expression
 )
 
-// Precendence table
-const (
-	_ int = iota
-	Lowest
-	Sum // +
-)
-
 // Parser holds the parser's internal state.
 type Parser struct {
 	l *lexer.Lexer
@@ -49,6 +42,9 @@ func New(l *lexer.Lexer) *Parser {
 
 	// register operators
 	p.registerInfixFunc(token.Plus, p.parseInfixExpression)
+	p.registerInfixFunc(token.Minus, p.parseInfixExpression)
+	p.registerInfixFunc(token.Asterisk, p.parseInfixExpression)
+	p.registerInfixFunc(token.Slash, p.parseInfixExpression)
 
 	// Prime the parser, so curToken and peekToken are in the right positions.
 	p.nextToken()
@@ -160,8 +156,19 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	return leftExp
 }
 
+// Precendence table
+const (
+	_ int = iota
+	Lowest
+	Sum     // +
+	Product // *
+)
+
 var precedences = map[token.TokenType]int{
-	token.Plus: Sum,
+	token.Plus:     Sum,
+	token.Minus:    Sum,
+	token.Asterisk: Product,
+	token.Slash:    Product,
 }
 
 func (p *Parser) curPrecedence() int {

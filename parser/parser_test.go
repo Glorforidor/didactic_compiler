@@ -80,6 +80,9 @@ func TestInfixExpressions(t *testing.T) {
 		rightValue interface{}
 	}{
 		{"5 + 5", 5, "+", 5},
+		{"5 - 5", 5, "-", 5},
+		{"5 * 5", 5, "*", 5},
+		{"5 / 5", 5, "/", 5},
 	}
 
 	for _, tt := range tests {

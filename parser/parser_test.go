@@ -104,6 +104,38 @@ func TestInfixExpressions(t *testing.T) {
 	}
 }
 
+func TestOperatorPrecedence(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{
+			input:    "5 + 5 - 5",
+			expected: "((5 + 5) - 5)",
+		},
+		{
+			input:    "5 + 5 * 2",
+			expected: "(5 + (5 * 2))",
+		},
+		{
+			input:    "5 + 5 / 2 * 3 - 2",
+			expected: "((5 + ((5 / 2) * 3)) - 2)",
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserError(t, p)
+
+		got := program.String()
+		if got != tt.expected {
+			t.Fatalf("expected=%q, got=%q", tt.expected, got)
+		}
+	}
+}
+
 func testInfixExpression(
 	t *testing.T, expr ast.Expression,
 	left interface{}, operator string, right interface{},

@@ -122,3 +122,26 @@ func (sl *StringLiteral) expressionNode()      {}
 func (sl *StringLiteral) Register() int        { return sl.Reg }
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) String() string       { return sl.Token.Literal }
+
+type InfixExpression struct {
+	Token    token.Token // The operator token (+, -, /, *)
+	Left     Expression
+	Operator string
+	Right    Expression
+	Reg      int
+}
+
+func (ie *InfixExpression) expressionNode()      {}
+func (ie *InfixExpression) Register() int        { return ie.Reg }
+func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
+func (ie *InfixExpression) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("(")
+	sb.WriteString(ie.Left.String())
+	sb.WriteString(" " + ie.Operator + " ")
+	sb.WriteString(ie.Right.String())
+	sb.WriteString(")")
+
+	return sb.String()
+}

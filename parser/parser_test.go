@@ -26,6 +26,15 @@ func checkParserError(t *testing.T, p *Parser) {
 	}
 }
 
+func checkProgramLength(t *testing.T, program *ast.Program) {
+	if len(program.Statements) != 1 {
+		t.Fatalf(
+			"program.Statements does not contain 1 statement. got=%d",
+			len(program.Statements),
+		)
+	}
+}
+
 func TestPrintStatement(t *testing.T) {
 	tests := []struct {
 		input         string
@@ -43,9 +52,7 @@ func TestPrintStatement(t *testing.T) {
 		program := p.ParseProgram()
 		checkParserError(t, p)
 
-		if len(program.Statements) != 1 {
-			t.Fatalf("program.Statements does not contain 1 statement. got=%d", len(program.Statements))
-		}
+		checkProgramLength(t, program)
 
 		stmt := program.Statements[0]
 		if stmt.TokenLiteral() != "print" {
@@ -65,24 +72,73 @@ func TestPrintStatement(t *testing.T) {
 	}
 }
 
+func TestInfixExpressions(t *testing.T) {
+	tests := []struct {
+		input      string
+		leftValue  interface{}
+		operator   string
+		rightValue interface{}
+	}{
+		{"5 + 5", 5, "+", 5},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserError(t, p)
+
+		checkProgramLength(t, program)
+
+		exprStmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("program.Statements[0] is not ast.ExpressionStatement. got=%T",
+				program.Statements[0],
+			)
+		}
+
+		testInfixExpression(t, exprStmt.Expression, tt.leftValue, tt.operator, tt.rightValue)
+	}
+}
+
+func testInfixExpression(
+	t *testing.T, expr ast.Expression,
+	left interface{}, operator string, right interface{},
+) {
+	t.Helper()
+
+	opExpr, ok := expr.(*ast.InfixExpression)
+	if !ok {
+		t.Fatalf("expr is not ast.InfixExpression. got=%T(%s)", expr, expr)
+	}
+
+	testLiteralExpression(t, opExpr.Left, left)
+
+	if opExpr.Operator != operator {
+		t.Fatalf("opExpr.Operator is not %q. got=%s", operator, opExpr.Operator)
+	}
+
+	testLiteralExpression(t, opExpr.Right, right)
+}
+
 func testLiteralExpression(
 	t *testing.T,
-	exp ast.Expression,
+	expr ast.Expression,
 	expected interface{},
 ) {
 	t.Helper()
 
 	switch v := expected.(type) {
 	case int:
-		testIntegerLiteral(t, exp, int64(v))
+		testIntegerLiteral(t, expr, int64(v))
 	case int64:
-		testIntegerLiteral(t, exp, v)
+		testIntegerLiteral(t, expr, v)
 	case float64:
-		testFloatLiteral(t, exp, v)
+		testFloatLiteral(t, expr, v)
 	case string:
-		testStringLiteral(t, exp, v)
+		testStringLiteral(t, expr, v)
 	default:
-		t.Fatalf("type of exp not handled. got=%T", exp)
+		t.Fatalf("type of exp not handled. got=%T", expr)
 	}
 }
 

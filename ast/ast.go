@@ -27,7 +27,7 @@ type Statement interface {
 type Expression interface {
 	Node
 
-	// Register returns a register number. 
+	// Register returns a register number.
 	Register() int
 
 	// expressionNode is not stricly needed, but will guide the Go compiler to
@@ -56,6 +56,21 @@ func (p *Program) String() string {
 	}
 
 	return sb.String()
+}
+
+type ExpressionStatement struct {
+	Token      token.Token // The first token of the expression
+	Expression Expression
+}
+
+func (es *ExpressionStatement) statementNode()       {}
+func (es *ExpressionStatement) TokenLiteral() string { return es.Token.Literal }
+func (es *ExpressionStatement) String() string {
+	if es.Expression != nil {
+		return es.Expression.String()
+	}
+
+	return ""
 }
 
 type PrintStatement struct {

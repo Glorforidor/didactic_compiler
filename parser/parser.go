@@ -62,6 +62,10 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.l.NextToken()
 }
 
+func (p *Parser) curTokenIs(t token.TokenType) bool {
+	return p.curToken.Type == t
+}
+
 func (p *Parser) registerPrefixFunc(tt token.TokenType, f prefixParseFunc) {
 	p.prefixParseFuncs[tt] = f
 }
@@ -72,6 +76,10 @@ func (p *Parser) registerInfixFunc(tt token.TokenType, f infixParseFunc) {
 
 func (p *Parser) Errors() []string {
 	return p.errors
+}
+
+func (p *Parser) errorf(format string, a ...interface{}) {
+	p.errors = append(p.errors, fmt.Sprintf(format, a...))
 }
 
 // ParseProgram parses the source language for the didactic compiler into an
@@ -104,6 +112,11 @@ func (p *Parser) parsePrintStatement() *ast.PrintStatement {
 
 	p.nextToken() // advance to the literal
 
+	if p.curTokenIs(token.Eof) {
+		p.errorf("invalid form for print statement - must have an argument")
+		return nil
+	}
+
 	stmt.Value = p.parseExpression(Lowest)
 
 	return stmt
@@ -120,11 +133,10 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefix := p.prefixParseFuncs[p.curToken.Type]
 	if prefix == nil {
-		msg := fmt.Sprintf(
+		p.errorf(
 			"no prefix parse function attached to token %s found",
 			p.curToken.Type,
 		)
-		p.errors = append(p.errors, msg)
 		return nil
 	}
 
@@ -187,8 +199,7 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 	if err != nil {
-		msg := fmt.Sprintf("could not parse %q as an integer", p.curToken.Literal)
-		p.errors = append(p.errors, msg)
+		p.errorf("could not parse %q as an integer", p.curToken.Literal)
 		return nil
 	}
 

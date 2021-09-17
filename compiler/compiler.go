@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
+	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type Compiler struct {
@@ -30,6 +31,10 @@ func New() *Compiler {
 }
 
 func (c *Compiler) Compile(node ast.Node) error {
+	if err := types.Checker(node); err != nil {
+		return err
+	}
+
 	switch node := node.(type) {
 	case *ast.Program:
 		for _, s := range node.Statements {
@@ -37,21 +42,25 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 		}
+	case *ast.ExpressionStatement:
+		if err := c.Compile(node.Expression); err != nil {
+			return err
+		}
 	case *ast.PrintStatement:
 		if err := c.Compile(node.Value); err != nil {
 			return err
 		}
 
-		// FIXME: When type checking comes in, then we add a type to an
-		// expression we can switch on.
 		var printType int
-		switch node.Value.(type) {
-		case *ast.IntegerLiteral:
+		switch node.Value.Type().Kind {
+		case ast.Int:
 			printType = 1
-		case *ast.FloatLiteral:
+		case ast.Float:
 			printType = 3
-		case *ast.StringLiteral:
+		case ast.String:
 			printType = 4
+		default:
+			return fmt.Errorf("compile error: can not print type: %q", node.Value.Type().Kind)
 		}
 
 		code := []string{
@@ -61,6 +70,28 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emit(code...)
 
 		c.registerTable.dealloc(node.Value.Register())
+	case *ast.InfixExpression:
+		if err := c.Compile(node.Left); err != nil {
+			return err
+		}
+
+		if err := c.Compile(node.Right); err != nil {
+			return err
+		}
+
+		switch node.Operator {
+		case "+":
+			code := []string{
+				fmt.Sprintf(
+					"add %s, %s, %s",
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Right.Register()),
+				),
+			}
+			c.emit(code...)
+		}
+		c.registerTable.dealloc(node.Right.Register())
 	case *ast.IntegerLiteral:
 		reg, err := c.registerTable.alloc()
 		if err != nil {
@@ -92,7 +123,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 			fmt.Sprintf(".double %g", node.Value),
 			".text",
 			// TODO: Change the below to allocate a float register
-			fmt.Sprintf("fld fa0, %s, %s", c.label.Name(), c.registerTable.name(reg)), 
+			fmt.Sprintf("fld fa0, %s, %s", c.label.Name(), c.registerTable.name(reg)),
 		}
 		c.emit(code...)
 	case *ast.StringLiteral:

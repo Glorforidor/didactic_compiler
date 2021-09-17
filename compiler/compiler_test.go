@@ -73,6 +73,14 @@ fld fa0, .L1, a0
 li a7, 3
 ecall`,
 		},
+		{
+			input: `print 2 + 2`,
+			expected: `li a0, 2
+li a1, 2
+add a0, a0, a1
+li a7, 1
+ecall`,
+		},
 	}
 
 	for _, tt := range tests {

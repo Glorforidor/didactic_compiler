@@ -11,9 +11,9 @@ import (
 type Compiler struct {
 	code []string
 
-	registerTable registerTable
+	registerTable      registerTable
 	registerFloatTable registerTable
-	label         label
+	label              label
 }
 
 func New() *Compiler {
@@ -57,6 +57,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.ExpressionStatement:
 		if err := c.Compile(node.Expression); err != nil {
 			return err
+		}
+
+		reg := node.Expression.Register()
+		switch node.Expression.Type().Kind {
+		case ast.Float:
+			c.registerFloatTable.dealloc(reg)
+		default:
+			c.registerTable.dealloc(reg)
 		}
 	case *ast.PrintStatement:
 		if err := c.Compile(node.Value); err != nil {
@@ -140,9 +148,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 			fmt.Sprintf(".double %g", node.Value),
 			".text",
 			fmt.Sprintf(
-				"fld %s, %s, %s", 
-				c.registerFloatTable.name(node.Reg), 
-				c.label.Name(), 
+				"fld %s, %s, %s",
+				c.registerFloatTable.name(node.Reg),
+				c.label.Name(),
 				c.registerTable.name(reg),
 			),
 		}

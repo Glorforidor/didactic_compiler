@@ -30,13 +30,8 @@ func TestChecker(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			input:         "print 2.0 + 2",
-			expectedType:  ast.Type{Kind: ast.Int},
-			expectedError: true,
-		},
-		{
 			input:         `print "Hello World" + 2`,
-			expectedType:  ast.Type{Kind: ast.Int},
+			expectedType:  ast.Type{},
 			expectedError: true,
 		},
 	}
@@ -46,13 +41,15 @@ func TestChecker(t *testing.T) {
 		p := parser.New(l)
 		program := p.ParseProgram()
 
+		t.Log(program.String())
+
 		if err := Checker(program); err != nil {
 			if !tt.expectedError {
 				t.Fatalf("checker had errors which was not expected. got=%s", err)
 			}
 			t.Log(tt.expectedType)
 
-			return
+			continue
 		}
 
 		for _, s := range program.Statements {

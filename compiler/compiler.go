@@ -12,6 +12,7 @@ type Compiler struct {
 	code []string
 
 	registerTable registerTable
+	registerFloatTable registerTable
 	label         label
 }
 
@@ -27,7 +28,18 @@ func New() *Compiler {
 		{name: "a7"},
 	}
 
-	return &Compiler{registerTable: rt}
+	ft := registerTable{
+		{name: "fa0"},
+		{name: "fa1"},
+		{name: "fa2"},
+		{name: "fa3"},
+		{name: "fa4"},
+		{name: "fa5"},
+		{name: "fa6"},
+		{name: "fa7"},
+	}
+
+	return &Compiler{registerTable: rt, registerFloatTable: ft}
 }
 
 func (c *Compiler) Compile(node ast.Node) error {
@@ -104,13 +116,18 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		c.emit(code...)
 	case *ast.FloatLiteral:
-		reg, err := c.registerTable.alloc()
+		reg, err := c.registerFloatTable.alloc()
 		if err != nil {
 			return err
 		}
 
-		// TODO: Should probably have a allocate floating point register func.
 		node.Reg = reg
+
+		// register a temporay register for the fld instruction.
+		reg, err = c.registerTable.alloc()
+		if err != nil {
+			return err
+		}
 
 		// create a label for the floating point
 		// TODO: maybe it would be nice to have different names for labels
@@ -122,10 +139,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 			fmt.Sprintf("%s:", c.label.Name()),
 			fmt.Sprintf(".double %g", node.Value),
 			".text",
-			// TODO: Change the below to allocate a float register
-			fmt.Sprintf("fld fa0, %s, %s", c.label.Name(), c.registerTable.name(reg)),
+			fmt.Sprintf(
+				"fld %s, %s, %s", 
+				c.registerFloatTable.name(node.Reg), 
+				c.label.Name(), 
+				c.registerTable.name(reg),
+			),
 		}
 		c.emit(code...)
+
+		// dealloc the temporay register
+		c.registerTable.dealloc(reg)
 	case *ast.StringLiteral:
 		reg, err := c.registerTable.alloc()
 		if err != nil {

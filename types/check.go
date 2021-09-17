@@ -15,7 +15,7 @@ func Checker(node ast.Node) error {
 			}
 		}
 	case *ast.ExpressionStatement:
-		if err := Checker(node); err != nil {
+		if err := Checker(node.Expression); err != nil {
 			return err
 		}
 	case *ast.PrintStatement:

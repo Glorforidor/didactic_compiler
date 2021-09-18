@@ -14,11 +14,12 @@ func parse(input string) *ast.Program {
 	return p.ParseProgram()
 }
 
+type compilerTest struct {
+	input, expected string
+}
+
 func TestPrintStatement(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
+	tests := []compilerTest{
 		{
 			input: "print 42",
 			expected: `li a0, 42
@@ -83,6 +84,41 @@ ecall`,
 		},
 	}
 
+	runCompilerTests(t, tests)
+}
+
+func TestArithmetic(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `2 + 2`,
+			expected: `li a0, 2
+li a1, 2
+add a0, a0, a1`,
+		},
+		{
+			input: `2 + 2
+3 + 3`,
+			expected: `li a0, 2
+li a1, 2
+add a0, a0, a1
+li a0, 3
+li a1, 3
+add a0, a0, a1`,
+		},
+		{
+			input: "2 - 2",
+			expected: `li a0, 2
+li a1, 2
+sub a0, a0, a1`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
+func runCompilerTests(t *testing.T, tests []compilerTest) {
+	t.Helper()
+
 	for _, tt := range tests {
 		program := parse(tt.input)
 
@@ -97,4 +133,5 @@ ecall`,
 			t.Fatalf("wrong assembly emitted.\nexpected=\n%q\ngot=\n%q", tt.expected, asm)
 		}
 	}
+
 }

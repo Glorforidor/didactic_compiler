@@ -99,9 +99,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
+		var code []string
+
 		switch node.Operator {
 		case "+":
-			code := []string{
+			code = []string{
 				fmt.Sprintf(
 					"add %s, %s, %s",
 					c.registerTable.name(node.Left.Register()),
@@ -109,8 +111,18 @@ func (c *Compiler) Compile(node ast.Node) error {
 					c.registerTable.name(node.Right.Register()),
 				),
 			}
-			c.emit(code...)
+		case "-":
+			code = []string{
+				fmt.Sprintf(
+					"sub %s, %s, %s",
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Right.Register()),
+				),
+			}
 		}
+
+		c.emit(code...)
 		c.registerTable.dealloc(node.Right.Register())
 	case *ast.IntegerLiteral:
 		reg, err := c.registerTable.alloc()

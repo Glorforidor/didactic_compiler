@@ -99,45 +99,27 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
-		var code []string
+		var operator string
 
 		switch node.Operator {
 		case "+":
-			code = []string{
-				fmt.Sprintf(
-					"add %s, %s, %s",
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Right.Register()),
-				),
-			}
+			operator = "add"
 		case "-":
-			code = []string{
-				fmt.Sprintf(
-					"sub %s, %s, %s",
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Right.Register()),
-				),
-			}
+			operator = "sub"
 		case "*":
-			code = []string{
-				fmt.Sprintf(
-					"mul %s, %s, %s",
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Right.Register()),
-				),
-			}
+			operator = "mul"
 		case "/":
-			code = []string{
-				fmt.Sprintf(
-					"div %s, %s, %s",
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Left.Register()),
-					c.registerTable.name(node.Right.Register()),
-				),
-			}
+			operator = "div"
+		}
+
+		code := []string{
+			fmt.Sprintf(
+				"%s %s, %s, %s",
+				operator,
+				c.registerTable.name(node.Left.Register()),
+				c.registerTable.name(node.Left.Register()),
+				c.registerTable.name(node.Right.Register()),
+			),
 		}
 
 		c.emit(code...)

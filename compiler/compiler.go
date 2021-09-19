@@ -100,7 +100,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		var operator string
-
 		switch node.Operator {
 		case "+":
 			operator = "add"
@@ -110,16 +109,36 @@ func (c *Compiler) Compile(node ast.Node) error {
 			operator = "mul"
 		case "/":
 			operator = "div"
+		default:
+			return fmt.Errorf("unknown operator: %s", node.Operator)
 		}
 
-		code := []string{
-			fmt.Sprintf(
-				"%s %s, %s, %s",
-				operator,
-				c.registerTable.name(node.Left.Register()),
-				c.registerTable.name(node.Left.Register()),
-				c.registerTable.name(node.Right.Register()),
-			),
+		var code []string
+
+		switch node.T.Kind {
+		case ast.Float:
+			// float point operations starts with f and end with .d for double
+			// precision.
+			operator = fmt.Sprintf("f%s.d", operator)
+			code = []string{
+				fmt.Sprintf(
+					"%s %s, %s, %s",
+					operator,
+					c.registerFloatTable.name(node.Left.Register()),
+					c.registerFloatTable.name(node.Left.Register()),
+					c.registerFloatTable.name(node.Right.Register()),
+				),
+			}
+		default:
+			code = []string{
+				fmt.Sprintf(
+					"%s %s, %s, %s",
+					operator,
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Right.Register()),
+				),
+			}
 		}
 
 		c.emit(code...)

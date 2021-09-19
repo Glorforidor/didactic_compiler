@@ -123,6 +123,62 @@ mul a0, a0, a1`,
 li a1, 2
 div a0, a0, a1`,
 		},
+		{
+			input: "2.1 + 2.1",
+			expected: `.data
+.L1:
+.double 2.1
+.text
+fld fa0, .L1, a0
+.data
+.L2:
+.double 2.1
+.text
+fld fa1, .L2, a0
+fadd.d fa0, fa0, fa1`,
+		},
+		{
+			input: "2.1 - 2.1",
+			expected: `.data
+.L1:
+.double 2.1
+.text
+fld fa0, .L1, a0
+.data
+.L2:
+.double 2.1
+.text
+fld fa1, .L2, a0
+fsub.d fa0, fa0, fa1`,
+		},
+		{
+			input: "2.1 * 2.1",
+			expected: `.data
+.L1:
+.double 2.1
+.text
+fld fa0, .L1, a0
+.data
+.L2:
+.double 2.1
+.text
+fld fa1, .L2, a0
+fmul.d fa0, fa0, fa1`,
+		},
+		{
+			input: "2.1 / 2.1",
+			expected: `.data
+.L1:
+.double 2.1
+.text
+fld fa0, .L1, a0
+.data
+.L2:
+.double 2.1
+.text
+fld fa1, .L2, a0
+fdiv.d fa0, fa0, fa1`,
+		},
 	}
 
 	runCompilerTests(t, tests)

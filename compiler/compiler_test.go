@@ -111,6 +111,18 @@ add a0, a0, a1`,
 li a1, 2
 sub a0, a0, a1`,
 		},
+		{
+			input: "2 * 2",
+			expected: `li a0, 2
+li a1, 2
+mul a0, a0, a1`,
+		},
+		{
+			input: "2 / 2",
+			expected: `li a0, 2
+li a1, 2
+div a0, a0, a1`,
+		},
 	}
 
 	runCompilerTests(t, tests)

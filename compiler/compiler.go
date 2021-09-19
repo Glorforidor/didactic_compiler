@@ -120,6 +120,24 @@ func (c *Compiler) Compile(node ast.Node) error {
 					c.registerTable.name(node.Right.Register()),
 				),
 			}
+		case "*":
+			code = []string{
+				fmt.Sprintf(
+					"mul %s, %s, %s",
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Right.Register()),
+				),
+			}
+		case "/":
+			code = []string{
+				fmt.Sprintf(
+					"div %s, %s, %s",
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Left.Register()),
+					c.registerTable.name(node.Right.Register()),
+				),
+			}
 		}
 
 		c.emit(code...)

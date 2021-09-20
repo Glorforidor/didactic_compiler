@@ -59,7 +59,7 @@ func (l *Lexer) NextToken() token.Token {
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()
-			tok.Type = token.Print
+			tok.Type = token.LookupIdentifier(tok.Literal)
 
 			// readIdentifier advances read positions, and therefore we must
 			// return early so we do not advance further.

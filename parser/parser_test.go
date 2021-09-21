@@ -82,6 +82,9 @@ func TestVarStatement(t *testing.T) {
 		{"var x int", "x", ast.Type{ast.Int}, nil},
 		{"var x float", "x", ast.Type{ast.Float}, nil},
 		{"var x string", "x", ast.Type{ast.String}, nil},
+		{"var x int = 1", "x", ast.Type{ast.Int}, 1},
+		{"var x float = 1.0", "x", ast.Type{ast.Float}, 1.0},
+		{`var x string = "Hello World"`, "x", ast.Type{ast.String}, "Hello World"},
 	}
 
 	for _, tt := range tests {

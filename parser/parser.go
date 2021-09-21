@@ -165,6 +165,13 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	stmt.Name = id
 
+	if p.peekTokenIs(token.Assign) {
+		p.nextToken() // "="
+		p.nextToken() // the expression
+
+		stmt.Value = p.parseExpression(Lowest)
+	}
+
 	return stmt
 }
 

@@ -22,6 +22,7 @@ const (
 	Minus    TokenType = "-"
 	Asterisk TokenType = "*"
 	Slash    TokenType = "/"
+	Assign   TokenType = "="
 
 	// Keywords
 	Print      TokenType = "PRINT"

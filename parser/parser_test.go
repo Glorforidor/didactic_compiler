@@ -252,10 +252,15 @@ func testFloatLiteral(t *testing.T, fl ast.Expression, value float64) {
 		t.Fatalf("float.Value is not %f. got=%f", value, float.Value)
 	}
 
-	// XXX: the float formatting needs to match exactly number digits in the
-	// fractional.
-	if float.TokenLiteral() != fmt.Sprintf("%.9f", value) {
-		t.Fatalf("float.TokenLiteral is not %.9f. got=%s", value, float.TokenLiteral())
+	// Kinda dirty, but format %g will give the maximum decimals to represent
+	// the float, the down side is that it strip trailing zeros, so 1.0 -> 1
+	v := fmt.Sprintf("%g", value)
+	if len(v) == 1 {
+		v += ".0"
+	}
+
+	if float.TokenLiteral() != v {
+		t.Fatalf("float.TokenLiteral is not %s. got=%s", v, float.TokenLiteral())
 	}
 }
 

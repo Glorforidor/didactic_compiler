@@ -44,7 +44,7 @@ type Program struct {
 }
 
 func (p *Program) TokenLiteral() string {
-	if len(p.Statements) > 0 {
+	if 0 < len(p.Statements) {
 		return p.Statements[0].TokenLiteral()
 	}
 
@@ -92,6 +92,39 @@ func (ps *PrintStatement) String() string {
 
 	return sb.String()
 }
+
+type VarStatement struct {
+	Token token.Token // The token.Var token.
+	Name  *Identifier
+	Value Expression
+}
+
+func (vs *VarStatement) statementNode()       {}
+func (vs *VarStatement) TokenLiteral() string { return vs.Token.Literal }
+func (vs *VarStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(vs.TokenLiteral())
+	sb.WriteString(" ")
+	sb.WriteString(vs.Name.String())
+	sb.WriteString(" = ")
+	sb.WriteString(vs.Value.String())
+
+	return sb.String()
+}
+
+type Identifier struct {
+	Token token.Token // The token.Ident token.
+	Value string      // e.g. foo, bar, foobar
+	Reg   int
+	T     Type
+}
+
+func (id *Identifier) expressionNode()      {}
+func (id *Identifier) Register() int        { return id.Reg }
+func (id *Identifier) Type() Type           { return id.T }
+func (id *Identifier) TokenLiteral() string { return id.Token.Literal }
+func (id *Identifier) String() string       { return id.Value }
 
 type IntegerLiteral struct {
 	Token token.Token // The token.Int token.

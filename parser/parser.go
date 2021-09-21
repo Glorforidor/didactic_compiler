@@ -62,6 +62,27 @@ func (p *Parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
 }
 
+func (p *Parser) peekTokenIs(t token.TokenType) bool {
+	return p.peekToken.Type == t
+}
+
+// expectPeek advances to next token if the next token is expected.
+func (p *Parser) expectPeek(ts ...token.TokenType) bool {
+	for _, t := range ts {
+		if p.peekTokenIs(t) {
+			p.nextToken()
+			return true
+		}
+	}
+
+	if len(ts) == 1 {
+		p.errorf("expected next token to be %s, got: %s", ts, p.peekToken.Type)
+	} else {
+		p.errorf("expected next token to be on of %v, got: %s", ts, p.peekToken.Type)
+	}
+	return false
+}
+
 func (p *Parser) registerPrefixFunc(tt token.TokenType, f prefixParseFunc) {
 	p.prefixParseFuncs[tt] = f
 }
@@ -98,6 +119,8 @@ func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.Print:
 		return p.parsePrintStatement()
+	case token.Var:
+		return p.parseVarStatement()
 	default:
 		return p.parseExpressionStatement()
 	}
@@ -114,6 +137,33 @@ func (p *Parser) parsePrintStatement() *ast.PrintStatement {
 	}
 
 	stmt.Value = p.parseExpression(Lowest)
+
+	return stmt
+}
+
+func (p *Parser) parseVarStatement() *ast.VarStatement {
+	stmt := &ast.VarStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.Ident) {
+		return nil
+	}
+
+	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.IntType, token.FloatType, token.StringType) {
+		return nil
+	}
+
+	switch p.curToken.Type {
+	case token.IntType:
+		id.T = ast.Type{Kind: ast.Int}
+	case token.FloatType:
+		id.T = ast.Type{Kind: ast.Float}
+	case token.StringType:
+		id.T = ast.Type{Kind: ast.String}
+	}
+
+	stmt.Name = id
 
 	return stmt
 }

@@ -56,7 +56,7 @@ func TestPrintStatement(t *testing.T) {
 
 		stmt := program.Statements[0]
 		if stmt.TokenLiteral() != "print" {
-			t.Fatalf("stmt.TokenLiteral not 'print'. got=%q", stmt.TokenLiteral())
+			t.Fatalf("stmt.TokenLiteral not %q. got=%q", "print", stmt.TokenLiteral())
 		}
 
 		printStmt, ok := stmt.(*ast.PrintStatement)
@@ -65,10 +65,56 @@ func TestPrintStatement(t *testing.T) {
 		}
 
 		if printStmt.TokenLiteral() != "print" {
-			t.Fatalf("printStmt.TokenLiteral not 'print', got=%q", printStmt.TokenLiteral())
+			t.Fatalf("printStmt.TokenLiteral not %q, got=%q", "print", printStmt.TokenLiteral())
 		}
 
 		testLiteralExpression(t, printStmt.Value, tt.expectedValue)
+	}
+}
+
+func TestVarStatement(t *testing.T) {
+	tests := []struct {
+		input              string
+		expectedIdentifier string
+		expectedType       ast.Type
+		expectedValue      interface{}
+	}{
+		{"var x int", "x", ast.Type{ast.Int}, nil},
+		{"var x float", "x", ast.Type{ast.Float}, nil},
+		{"var x string", "x", ast.Type{ast.String}, nil},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+
+		program := p.ParseProgram()
+		checkParserError(t, p)
+
+		checkProgramLength(t, program)
+
+		stmt := program.Statements[0]
+		if stmt.TokenLiteral() != "var" {
+			t.Fatalf("stmt.TokenLiteral not %q. got=%q", "var", stmt.TokenLiteral())
+		}
+
+		varStmt, ok := stmt.(*ast.VarStatement)
+		if !ok {
+			t.Fatalf("stmt not *ast.VarStatement. got=%T", stmt)
+		}
+
+		if varStmt.Name.Value != tt.expectedIdentifier {
+			t.Fatalf("varStmt.Name.Value not %q, got=%q", tt.expectedIdentifier, varStmt.Name.Value)
+		}
+
+		if varStmt.Name.T.Kind != tt.expectedType.Kind {
+			t.Fatalf("varStmt.Name.T.Kind is not %T, got=%T", tt.expectedType, varStmt.Name.T.Kind)
+		}
+
+		if tt.expectedValue != nil {
+			val := varStmt.Value
+			testLiteralExpression(t, val, tt.expectedValue)
+		}
 	}
 }
 

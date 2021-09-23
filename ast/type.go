@@ -14,5 +14,5 @@ type Type struct {
 }
 
 func (k kind) String() string {
-	return [...]string{"Unknown", "Int", "Float", "String"}[k]
+	return [...]string{"unknown", "int", "float", "string"}[k]
 }

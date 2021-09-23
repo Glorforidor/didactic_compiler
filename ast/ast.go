@@ -107,8 +107,11 @@ func (vs *VarStatement) String() string {
 	sb.WriteString(vs.TokenLiteral())
 	sb.WriteString(" ")
 	sb.WriteString(vs.Name.String())
-	sb.WriteString(" = ")
-	sb.WriteString(vs.Value.String())
+
+	if vs.Value != nil {
+		sb.WriteString(" = ")
+		sb.WriteString(vs.Value.String())
+	}
 
 	return sb.String()
 }
@@ -124,7 +127,15 @@ func (id *Identifier) expressionNode()      {}
 func (id *Identifier) Register() int        { return id.Reg }
 func (id *Identifier) Type() Type           { return id.T }
 func (id *Identifier) TokenLiteral() string { return id.Token.Literal }
-func (id *Identifier) String() string       { return id.Value }
+func (id *Identifier) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(id.Value)
+	sb.WriteString(" ")
+	sb.WriteString(id.T.Kind.String())
+
+	return sb.String()
+}
 
 type IntegerLiteral struct {
 	Token token.Token // The token.Int token.

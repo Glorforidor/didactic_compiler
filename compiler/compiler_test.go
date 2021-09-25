@@ -22,17 +22,20 @@ func TestPrintStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
 			input: "print 42",
-			expected: `li a0, 42
+			expected: `li t0, 42
+mv a0, t0
 li a7, 1
 ecall`,
 		},
 		{
 			input: `print 42
 print 43`,
-			expected: `li a0, 42
+			expected: `li t0, 42
+mv a0, t0
 li a7, 1
 ecall
-li a0, 43
+li t0, 43
+mv a0, t0
 li a7, 1
 ecall`,
 		},
@@ -42,7 +45,8 @@ ecall`,
 .L1:
 .string "Hello World"
 .text
-la a0, .L1
+la t0, .L1
+mv a0, t0
 li a7, 4
 ecall`,
 		},
@@ -53,14 +57,16 @@ print "Hello Peeps"`,
 .L1:
 .string "Hello World"
 .text
-la a0, .L1
+la t0, .L1
+mv a0, t0
 li a7, 4
 ecall
 .data
 .L2:
 .string "Hello Peeps"
 .text
-la a0, .L2
+la t0, .L2
+mv a0, t0
 li a7, 4
 ecall`,
 		},
@@ -70,15 +76,17 @@ ecall`,
 .L1:
 .double 42.1
 .text
-fld fa0, .L1, a0
+fld ft0, .L1, t0
+fmv.d fa0, ft0
 li a7, 3
 ecall`,
 		},
 		{
 			input: `print 2 + 2`,
-			expected: `li a0, 2
-li a1, 2
-add a0, a0, a1
+			expected: `li t0, 2
+li t1, 2
+add t0, t0, t1
+mv a0, t0
 li a7, 1
 ecall`,
 		},
@@ -91,37 +99,37 @@ func TestArithmetic(t *testing.T) {
 	tests := []compilerTest{
 		{
 			input: `2 + 2`,
-			expected: `li a0, 2
-li a1, 2
-add a0, a0, a1`,
+			expected: `li t0, 2
+li t1, 2
+add t0, t0, t1`,
 		},
 		{
 			input: `2 + 2
 3 + 3`,
-			expected: `li a0, 2
-li a1, 2
-add a0, a0, a1
-li a0, 3
-li a1, 3
-add a0, a0, a1`,
+			expected: `li t0, 2
+li t1, 2
+add t0, t0, t1
+li t0, 3
+li t1, 3
+add t0, t0, t1`,
 		},
 		{
 			input: "2 - 2",
-			expected: `li a0, 2
-li a1, 2
-sub a0, a0, a1`,
+			expected: `li t0, 2
+li t1, 2
+sub t0, t0, t1`,
 		},
 		{
 			input: "2 * 2",
-			expected: `li a0, 2
-li a1, 2
-mul a0, a0, a1`,
+			expected: `li t0, 2
+li t1, 2
+mul t0, t0, t1`,
 		},
 		{
 			input: "2 / 2",
-			expected: `li a0, 2
-li a1, 2
-div a0, a0, a1`,
+			expected: `li t0, 2
+li t1, 2
+div t0, t0, t1`,
 		},
 		{
 			input: "2.1 + 2.1",
@@ -129,13 +137,13 @@ div a0, a0, a1`,
 .L1:
 .double 2.1
 .text
-fld fa0, .L1, a0
+fld ft0, .L1, t0
 .data
 .L2:
 .double 2.1
 .text
-fld fa1, .L2, a0
-fadd.d fa0, fa0, fa1`,
+fld ft1, .L2, t0
+fadd.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 - 2.1",
@@ -143,13 +151,13 @@ fadd.d fa0, fa0, fa1`,
 .L1:
 .double 2.1
 .text
-fld fa0, .L1, a0
+fld ft0, .L1, t0
 .data
 .L2:
 .double 2.1
 .text
-fld fa1, .L2, a0
-fsub.d fa0, fa0, fa1`,
+fld ft1, .L2, t0
+fsub.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 * 2.1",
@@ -157,13 +165,13 @@ fsub.d fa0, fa0, fa1`,
 .L1:
 .double 2.1
 .text
-fld fa0, .L1, a0
+fld ft0, .L1, t0
 .data
 .L2:
 .double 2.1
 .text
-fld fa1, .L2, a0
-fmul.d fa0, fa0, fa1`,
+fld ft1, .L2, t0
+fmul.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 / 2.1",
@@ -171,13 +179,21 @@ fmul.d fa0, fa0, fa1`,
 .L1:
 .double 2.1
 .text
-fld fa0, .L1, a0
+fld ft0, .L1, t0
 .data
 .L2:
 .double 2.1
 .text
-fld fa1, .L2, a0
-fdiv.d fa0, fa0, fa1`,
+fld ft1, .L2, t0
+fdiv.d ft0, ft0, ft1`,
+		},
+		{
+			input: "2 + 2 - 2",
+			expected: `li t0, 2
+li t1, 2
+add t0, t0, t1
+li t1, 2
+sub t0, t0, t1`,
 		},
 	}
 

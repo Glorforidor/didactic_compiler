@@ -18,28 +18,32 @@ type Compiler struct {
 
 func New() *Compiler {
 	rt := registerTable{
-		{name: "a0"},
-		{name: "a1"},
-		{name: "a2"},
-		{name: "a3"},
-		{name: "a4"},
-		{name: "a5"},
-		{name: "a6"},
-		{name: "a7"},
+		{name: "t0"},
+		{name: "t1"},
+		{name: "t2"},
+		{name: "t3"},
+		{name: "t4"},
+		{name: "t5"},
+		{name: "t6"},
+		{name: "t7"},
 	}
 
 	ft := registerTable{
-		{name: "fa0"},
-		{name: "fa1"},
-		{name: "fa2"},
-		{name: "fa3"},
-		{name: "fa4"},
-		{name: "fa5"},
-		{name: "fa6"},
-		{name: "fa7"},
+		{name: "ft0"},
+		{name: "ft1"},
+		{name: "ft2"},
+		{name: "ft3"},
+		{name: "ft4"},
+		{name: "ft5"},
+		{name: "ft6"},
+		{name: "ft7"},
 	}
 
-	return &Compiler{registerTable: rt, registerFloatTable: ft}
+	return &Compiler{
+		symbolTable:        NewSymbolTable(),
+		registerTable:      rt,
+		registerFloatTable: ft,
+	}
 }
 
 func (c *Compiler) Compile(node ast.Node) error {
@@ -83,13 +87,66 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return fmt.Errorf("compile error: can not print type: %q", node.Value.Type().Kind)
 		}
 
-		code := []string{
-			fmt.Sprintf("li a7, %d", printType),
-			"ecall",
+		reg := node.Value.Register()
+
+		var code []string
+		if printType == 3 {
+			code = []string{
+				fmt.Sprintf("fmv.d fa0, %s", c.registerFloatTable.name(reg)),
+				fmt.Sprintf("li a7, %d", printType),
+				"ecall",
+			}
+		} else {
+			code = []string{
+				fmt.Sprintf("mv a0, %s", c.registerTable.name(reg)),
+				fmt.Sprintf("li a7, %d", printType),
+				"ecall",
+			}
 		}
+
 		c.emit(code...)
 
 		c.registerTable.dealloc(node.Value.Register())
+	case *ast.VarStatement:
+		c.symbolTable.Define(node.Name.Value)
+
+		var val string
+		if node.Value == nil {
+			switch node.Name.T.Kind {
+			case ast.Int:
+				val = "0"
+			}
+		} else {
+			val = node.Value.TokenLiteral()
+		}
+
+		// The label name is the name of the identifier.
+		code := []string{
+			".data",
+			fmt.Sprintf("%s: .dword %s", node.Name.Value, val),
+		}
+		c.emit(code...)
+	case *ast.Identifier:
+		symbol, ok := c.symbolTable.Resolve(node.Value)
+		if !ok {
+			return fmt.Errorf("compiler error: undefined variable %s", node.Value)
+		}
+
+		reg, err := c.registerTable.alloc()
+		if err != nil {
+			return err
+		}
+
+		node.Reg = reg
+
+		regName := c.registerTable.name(reg)
+
+		code := []string{
+			fmt.Sprintf("la %s, %s", regName, symbol.Name),
+			fmt.Sprintf("ld %s, 0(%s)", regName, regName),
+		}
+
+		c.emit(code...)
 	case *ast.InfixExpression:
 		if err := c.Compile(node.Left); err != nil {
 			return err

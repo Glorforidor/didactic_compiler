@@ -6,7 +6,9 @@ import (
 
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/lexer"
+	"github.com/Glorforidor/didactic_compiler/symbol"
 	"github.com/Glorforidor/didactic_compiler/token"
+	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type (
@@ -23,6 +25,8 @@ type Parser struct {
 	curToken  token.Token
 	peekToken token.Token
 
+	symbolTable *symbol.Table
+
 	// Pratt parsing maps token types with parsing functions.
 	prefixParseFuncs map[token.TokenType]prefixParseFunc
 	infixParseFuncs  map[token.TokenType]infixParseFunc
@@ -31,6 +35,7 @@ type Parser struct {
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l:                l,
+		symbolTable:      symbol.NewTable(),
 		prefixParseFuncs: make(map[token.TokenType]prefixParseFunc),
 		infixParseFuncs:  make(map[token.TokenType]infixParseFunc),
 	}
@@ -39,6 +44,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefixFunc(token.Int, p.parseIntegerLiteral)
 	p.registerPrefixFunc(token.Float, p.parseFloatLiteral)
 	p.registerPrefixFunc(token.String, p.parseStringLiteral)
+
+	// register identifier
+	p.registerPrefixFunc(token.Ident, p.parseIdentifier)
 
 	// register operators
 	p.registerInfixFunc(token.Plus, p.parseInfixExpression)
@@ -112,6 +120,8 @@ func (p *Parser) ParseProgram() *ast.Program {
 		p.nextToken()
 	}
 
+	program.SymbolTable = p.symbolTable
+
 	return &program
 }
 
@@ -156,14 +166,16 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	switch p.curToken.Type {
 	case token.IntType:
-		id.T = ast.Type{Kind: ast.Int}
+		id.T = types.Type{Kind: types.Int}
 	case token.FloatType:
-		id.T = ast.Type{Kind: ast.Float}
+		id.T = types.Type{Kind: types.Float}
 	case token.StringType:
-		id.T = ast.Type{Kind: ast.String}
+		id.T = types.Type{Kind: types.String}
 	}
 
 	stmt.Name = id
+
+	p.symbolTable.Define(stmt.Name.Value, stmt.Name.T)
 
 	if p.peekTokenIs(token.Assign) {
 		p.nextToken() // "="
@@ -289,4 +301,8 @@ func (p *Parser) parseFloatLiteral() ast.Expression {
 
 func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseIdentifier() ast.Expression {
+	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 }

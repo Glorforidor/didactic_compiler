@@ -6,6 +6,7 @@ import (
 
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/lexer"
+	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 func checkParserError(t *testing.T, p *Parser) {
@@ -76,15 +77,15 @@ func TestVarStatement(t *testing.T) {
 	tests := []struct {
 		input              string
 		expectedIdentifier string
-		expectedType       ast.Type
+		expectedType       types.Type
 		expectedValue      interface{}
 	}{
-		{"var x int", "x", ast.Type{ast.Int}, nil},
-		{"var x float", "x", ast.Type{ast.Float}, nil},
-		{"var x string", "x", ast.Type{ast.String}, nil},
-		{"var x int = 1", "x", ast.Type{ast.Int}, 1},
-		{"var x float = 1.0", "x", ast.Type{ast.Float}, 1.0},
-		{`var x string = "Hello World"`, "x", ast.Type{ast.String}, "Hello World"},
+		{"var x int", "x", types.Type{types.Int}, nil},
+		{"var x float", "x", types.Type{types.Float}, nil},
+		{"var x string", "x", types.Type{types.String}, nil},
+		{"var x int = 1", "x", types.Type{types.Int}, 1},
+		{"var x float = 1.0", "x", types.Type{types.Float}, 1.0},
+		{`var x string = "Hello World"`, "x", types.Type{types.String}, "Hello World"},
 	}
 
 	for _, tt := range tests {
@@ -117,6 +118,10 @@ func TestVarStatement(t *testing.T) {
 		if tt.expectedValue != nil {
 			val := varStmt.Value
 			testLiteralExpression(t, val, tt.expectedValue)
+		}
+
+		if _, ok := program.SymbolTable.Resolve(varStmt.Name.Value); !ok {
+			t.Fatalf("varStmt did not define identifier: %q in symbol table", varStmt.Name.Value)
 		}
 	}
 }

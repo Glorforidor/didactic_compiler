@@ -25,7 +25,9 @@ func TestPrintStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
 			input: "print 42",
-			expected: `li t0, 42
+			expected: `.data
+.text
+li t0, 42
 mv a0, t0
 li a7, 1
 ecall`,
@@ -33,7 +35,9 @@ ecall`,
 		{
 			input: `print 42
 print 43`,
-			expected: `li t0, 42
+			expected: `.data
+.text
+li t0, 42
 mv a0, t0
 li a7, 1
 ecall
@@ -45,8 +49,7 @@ ecall`,
 		{
 			input: `print "Hello World"`,
 			expected: `.data
-.L1:
-.string "Hello World"
+.L1: .string "Hello World"
 .text
 la t0, .L1
 mv a0, t0
@@ -57,17 +60,13 @@ ecall`,
 			input: `print "Hello World"
 print "Hello Peeps"`,
 			expected: `.data
-.L1:
-.string "Hello World"
+.L1: .string "Hello World"
+.L2: .string "Hello Peeps"
 .text
 la t0, .L1
 mv a0, t0
 li a7, 4
 ecall
-.data
-.L2:
-.string "Hello Peeps"
-.text
 la t0, .L2
 mv a0, t0
 li a7, 4
@@ -76,8 +75,7 @@ ecall`,
 		{
 			input: `print 42.1`,
 			expected: `.data
-.L1:
-.double 42.1
+.L1: .double 42.1
 .text
 fld ft0, .L1, t0
 fmv.d fa0, ft0
@@ -86,7 +84,9 @@ ecall`,
 		},
 		{
 			input: `print 2 + 2`,
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 add t0, t0, t1
 mv a0, t0
@@ -103,7 +103,17 @@ func TestVarStatement(t *testing.T) {
 		{
 			input: "var x int",
 			expected: `.data
-x: .dword 0`,
+x: .dword 0
+.text`,
+		},
+		{
+			input: `var x int
+x`,
+			expected: `.data
+x: .dword 0
+.text
+la t0, x
+ld t0, 0(t0)`,
 		},
 	}
 
@@ -114,14 +124,18 @@ func TestArithmetic(t *testing.T) {
 	tests := []compilerTest{
 		{
 			input: `2 + 2`,
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 add t0, t0, t1`,
 		},
 		{
 			input: `2 + 2
 3 + 3`,
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 add t0, t0, t1
 li t0, 3
@@ -130,81 +144,73 @@ add t0, t0, t1`,
 		},
 		{
 			input: "2 - 2",
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 sub t0, t0, t1`,
 		},
 		{
 			input: "2 * 2",
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 mul t0, t0, t1`,
 		},
 		{
 			input: "2 / 2",
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 div t0, t0, t1`,
 		},
 		{
 			input: "2.1 + 2.1",
 			expected: `.data
-.L1:
-.double 2.1
+.L1: .double 2.1
+.L2: .double 2.1
 .text
 fld ft0, .L1, t0
-.data
-.L2:
-.double 2.1
-.text
 fld ft1, .L2, t0
 fadd.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 - 2.1",
 			expected: `.data
-.L1:
-.double 2.1
+.L1: .double 2.1
+.L2: .double 2.1
 .text
 fld ft0, .L1, t0
-.data
-.L2:
-.double 2.1
-.text
 fld ft1, .L2, t0
 fsub.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 * 2.1",
 			expected: `.data
-.L1:
-.double 2.1
+.L1: .double 2.1
+.L2: .double 2.1
 .text
 fld ft0, .L1, t0
-.data
-.L2:
-.double 2.1
-.text
 fld ft1, .L2, t0
 fmul.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 / 2.1",
 			expected: `.data
-.L1:
-.double 2.1
+.L1: .double 2.1
+.L2: .double 2.1
 .text
 fld ft0, .L1, t0
-.data
-.L2:
-.double 2.1
-.text
 fld ft1, .L2, t0
 fdiv.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2 + 2 - 2",
-			expected: `li t0, 2
+			expected: `.data
+.text
+li t0, 2
 li t1, 2
 add t0, t0, t1
 li t1, 2

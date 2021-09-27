@@ -10,7 +10,8 @@ import (
 )
 
 type Compiler struct {
-	code []string
+	constants []string
+	code      []string
 
 	symbolTable        *symbol.Table
 	registerTable      registerTable
@@ -117,11 +118,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		// The label name is the name of the identifier.
-		code := []string{
-			".data",
+		data := []string{
 			fmt.Sprintf("%s: .dword %s", node.Name.Value, val),
 		}
-		c.emit(code...)
+		c.addConstant(data...)
 	case *ast.Identifier:
 		symbol, ok := c.symbolTable.Resolve(node.Value)
 		if !ok {
@@ -226,11 +226,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// after their type.
 		c.label.Create()
 
+		data := []string{
+			fmt.Sprintf("%s: .double %g", c.label.Name(), node.Value),
+		}
+
 		code := []string{
-			".data",
-			fmt.Sprintf("%s:", c.label.Name()),
-			fmt.Sprintf(".double %g", node.Value),
-			".text",
 			fmt.Sprintf(
 				"fld %s, %s, %s",
 				c.registerFloatTable.name(node.Reg),
@@ -238,6 +238,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 				c.registerTable.name(reg),
 			),
 		}
+
+		c.addConstant(data...)
 		c.emit(code...)
 
 		// dealloc the temporay register
@@ -251,14 +253,15 @@ func (c *Compiler) Compile(node ast.Node) error {
 		node.Reg = reg
 		c.label.Create()
 
+		data := []string{
+			fmt.Sprintf("%s: .string %q", c.label.Name(), node.Value),
+		}
+
 		code := []string{
-			".data",
-			fmt.Sprintf("%s:", c.label.Name()),
-			fmt.Sprintf(".string %q", node.Value),
-			".text",
 			fmt.Sprintf("la %s, %s", c.registerTable.name(node.Reg), c.label.Name()),
 		}
 
+		c.addConstant(data...)
 		c.emit(code...)
 	default:
 		return fmt.Errorf("unknown type: %#v", node)
@@ -271,14 +274,24 @@ func (c *Compiler) emit(code ...string) {
 	c.code = append(c.code, code...)
 }
 
+func (c *Compiler) addConstant(data ...string) {
+	c.constants = append(c.constants, data...)
+}
+
 func (c *Compiler) Asm() string {
 	var sb strings.Builder
 
-	for i, t := range c.code {
+	sb.WriteString(".data")
+	sb.WriteString("\n")
+	for _, d := range c.constants {
+		sb.WriteString(d)
+		sb.WriteString("\n")
+	}
+
+	sb.WriteString(".text")
+	for _, t := range c.code {
+		sb.WriteString("\n")
 		sb.WriteString(t)
-		if i != len(c.code)-1 {
-			sb.WriteString("\n")
-		}
 	}
 
 	return sb.String()

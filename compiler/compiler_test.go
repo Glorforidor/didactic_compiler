@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
+	"github.com/Glorforidor/didactic_compiler/checker"
 	"github.com/Glorforidor/didactic_compiler/lexer"
 	"github.com/Glorforidor/didactic_compiler/parser"
 )
@@ -11,7 +12,9 @@ import (
 func parse(input string) *ast.Program {
 	l := lexer.New(input)
 	p := parser.New(l)
-	return p.ParseProgram()
+	program := p.ParseProgram()
+	checker.Check(program)
+	return program
 }
 
 type compilerTest struct {
@@ -89,6 +92,18 @@ add t0, t0, t1
 mv a0, t0
 li a7, 1
 ecall`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
+func TestVarStatement(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: "var x int",
+			expected: `.data
+x: .dword 0`,
 		},
 	}
 

@@ -5,12 +5,14 @@ import (
 	"strings"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
+	"github.com/Glorforidor/didactic_compiler/symbol"
 	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type Compiler struct {
 	code []string
 
+	symbolTable        *symbol.Table
 	registerTable      registerTable
 	registerFloatTable registerTable
 	label              label
@@ -40,19 +42,15 @@ func New() *Compiler {
 	}
 
 	return &Compiler{
-		symbolTable:        NewSymbolTable(),
 		registerTable:      rt,
 		registerFloatTable: ft,
 	}
 }
 
 func (c *Compiler) Compile(node ast.Node) error {
-	if err := types.Checker(node); err != nil {
-		return err
-	}
-
 	switch node := node.(type) {
 	case *ast.Program:
+		c.symbolTable = node.SymbolTable
 		for _, s := range node.Statements {
 			if err := c.Compile(s); err != nil {
 				return err
@@ -65,7 +63,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		reg := node.Expression.Register()
 		switch node.Expression.Type().Kind {
-		case ast.Float:
+		case types.Float:
 			c.registerFloatTable.dealloc(reg)
 		default:
 			c.registerTable.dealloc(reg)
@@ -77,11 +75,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		var printType int
 		switch node.Value.Type().Kind {
-		case ast.Int:
+		case types.Int:
 			printType = 1
-		case ast.Float:
+		case types.Float:
 			printType = 3
-		case ast.String:
+		case types.String:
 			printType = 4
 		default:
 			return fmt.Errorf("compile error: can not print type: %q", node.Value.Type().Kind)
@@ -108,12 +106,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.registerTable.dealloc(node.Value.Register())
 	case *ast.VarStatement:
-		c.symbolTable.Define(node.Name.Value)
-
 		var val string
 		if node.Value == nil {
 			switch node.Name.T.Kind {
-			case ast.Int:
+			case types.Int:
 				val = "0"
 			}
 		} else {
@@ -173,7 +169,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		var code []string
 
 		switch node.T.Kind {
-		case ast.Float:
+		case types.Float:
 			// float point operations starts with f and end with .d for double
 			// precision.
 			operator = fmt.Sprintf("f%s.d", operator)

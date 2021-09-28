@@ -107,19 +107,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.registerTable.dealloc(node.Value.Register())
 	case *ast.VarStatement:
-		var val string
-		if node.Value == nil {
-			switch node.Name.T.Kind {
-			case types.Int:
-				val = "0"
-			}
-		} else {
-			val = node.Value.TokenLiteral()
+		l, err := createASMLabel(node.Name.Value, node.Name.T, node.Value)
+		if err != nil {
+			return err
 		}
-
 		// The label name is the name of the identifier.
 		data := []string{
-			fmt.Sprintf("%s: .dword %s", node.Name.Value, val),
+			l,
 		}
 		c.addConstant(data...)
 	case *ast.Identifier:
@@ -226,8 +220,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// after their type.
 		c.label.Create()
 
+		l, err := createASMLabel(c.label.Name(), node.T, node.Value)
+		if err != nil {
+			return err
+		}
+
 		data := []string{
-			fmt.Sprintf("%s: .double %g", c.label.Name(), node.Value),
+			l,
 		}
 
 		code := []string{
@@ -253,8 +252,13 @@ func (c *Compiler) Compile(node ast.Node) error {
 		node.Reg = reg
 		c.label.Create()
 
+		l, err := createASMLabel(c.label.Name(), node.T, node.Value)
+		if err != nil {
+			return err
+		}
+
 		data := []string{
-			fmt.Sprintf("%s: .string %q", c.label.Name(), node.Value),
+			l,
 		}
 
 		code := []string{
@@ -295,4 +299,32 @@ func (c *Compiler) Asm() string {
 	}
 
 	return sb.String()
+}
+
+func createASMLabel(name string, t types.Type, value interface{}) (string, error) {
+	if value == nil {
+		value = zeroValue(t)
+	}
+
+	switch t.Kind {
+	case types.Int:
+		return fmt.Sprintf("%s: .dword %d", name, value), nil
+	case types.Float:
+		return fmt.Sprintf("%s: .double %g", name, value), nil
+	case types.String:
+		return fmt.Sprintf("%s: .string %q", name, value), nil
+	default:
+		return "", fmt.Errorf("compiler error: could create label: %s with type: %T", name, t)
+	}
+}
+
+func zeroValue(t types.Type) interface{} {
+	switch t.Kind {
+	case types.Float:
+		return 0.0
+	case types.String:
+		return ""
+	default:
+		return 0
+	}
 }

@@ -107,6 +107,18 @@ x: .dword 0
 .text`,
 		},
 		{
+			input: "var x string",
+			expected: `.data
+x: .string ""
+.text`,
+		},
+		{
+			input: "var x float",
+			expected: `.data
+x: .double 0
+.text`,
+		},
+		{
 			input: `var x int
 x`,
 			expected: `.data

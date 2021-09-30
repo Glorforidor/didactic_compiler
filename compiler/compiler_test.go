@@ -7,12 +7,15 @@ import (
 	"github.com/Glorforidor/didactic_compiler/checker"
 	"github.com/Glorforidor/didactic_compiler/lexer"
 	"github.com/Glorforidor/didactic_compiler/parser"
+	"github.com/Glorforidor/didactic_compiler/resolver"
+	"github.com/Glorforidor/didactic_compiler/symbol"
 )
 
 func parse(input string) *ast.Program {
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
+	resolver.Resolve(program, symbol.NewTable())
 	checker.Check(program)
 	return program
 }

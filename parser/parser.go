@@ -1,3 +1,5 @@
+// Package parser implements a Top Down Operator Precedence parser also known
+// as Pratt parser for the source language of the didactic compiler.
 package parser
 
 import (
@@ -6,7 +8,6 @@ import (
 
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/lexer"
-	"github.com/Glorforidor/didactic_compiler/symbol"
 	"github.com/Glorforidor/didactic_compiler/token"
 	"github.com/Glorforidor/didactic_compiler/types"
 )
@@ -25,8 +26,6 @@ type Parser struct {
 	curToken  token.Token
 	peekToken token.Token
 
-	symbolTable *symbol.Table
-
 	// Pratt parsing maps token types with parsing functions.
 	prefixParseFuncs map[token.TokenType]prefixParseFunc
 	infixParseFuncs  map[token.TokenType]infixParseFunc
@@ -35,7 +34,6 @@ type Parser struct {
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{
 		l:                l,
-		symbolTable:      symbol.NewTable(),
 		prefixParseFuncs: make(map[token.TokenType]prefixParseFunc),
 		infixParseFuncs:  make(map[token.TokenType]infixParseFunc),
 	}
@@ -120,8 +118,6 @@ func (p *Parser) ParseProgram() *ast.Program {
 		p.nextToken()
 	}
 
-	program.SymbolTable = p.symbolTable
-
 	return &program
 }
 
@@ -174,8 +170,6 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 	}
 
 	stmt.Name = id
-
-	p.symbolTable.Define(stmt.Name.Value, stmt.Name.T)
 
 	if p.peekTokenIs(token.Assign) {
 		p.nextToken() // "="

@@ -1,6 +1,8 @@
 package symbol
 
 import (
+	"fmt"
+
 	"github.com/Glorforidor/didactic_compiler/types"
 )
 
@@ -38,10 +40,14 @@ func NewTable() *Table {
 	}
 }
 
-func (st *Table) Define(name string, t types.Type) Symbol {
+func (st *Table) Define(name string, t types.Type) (Symbol, error) {
+	if s, ok := st.store[name]; ok {
+		return s, fmt.Errorf("identifier: %s already defined in scope", name)
+	}
+
 	s := Symbol{Name: name, Scope: GlobalScope, Type: t}
 	st.store[name] = s
-	return s
+	return s, nil
 }
 
 func (st *Table) Resolve(name string) (Symbol, bool) {

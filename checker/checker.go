@@ -50,10 +50,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			)
 		}
 	case *ast.Identifier:
-		sym, ok := symbolTable.Resolve(node.Value)
-		if !ok {
-			return fmt.Errorf("type error: identifier: %s is undefined", node.Value)
-		}
+		sym, _ := symbolTable.Resolve(node.Value)
 		if sym.Type.Kind == types.Unknown {
 			return fmt.Errorf("type error: identifier: %s is unknown", node.Value)
 		}

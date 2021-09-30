@@ -14,12 +14,12 @@ func TestDefine(t *testing.T) {
 
 	global := NewTable()
 
-	x := global.Define("x", types.Type{Kind: types.Int})
+	x, _ := global.Define("x", types.Type{Kind: types.Int})
 	if x != expected["x"] {
 		t.Errorf("expected x=%+v, got=%+v", expected["x"], x)
 	}
 
-	y := global.Define("y", types.Type{Kind: types.Int})
+	y, _ := global.Define("y", types.Type{Kind: types.Int})
 	if y != expected["y"] {
 		t.Errorf("expected y=%+v, got=%+v", expected["y"], y)
 	}

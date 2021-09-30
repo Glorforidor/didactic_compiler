@@ -119,10 +119,6 @@ func TestVarStatement(t *testing.T) {
 			val := varStmt.Value
 			testLiteralExpression(t, val, tt.expectedValue)
 		}
-
-		if _, ok := program.SymbolTable.Resolve(varStmt.Name.Value); !ok {
-			t.Fatalf("varStmt did not define identifier: %q in symbol table", varStmt.Name.Value)
-		}
 	}
 }
 

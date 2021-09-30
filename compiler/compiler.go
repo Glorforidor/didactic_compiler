@@ -117,10 +117,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		c.addConstant(data...)
 	case *ast.Identifier:
-		symbol, ok := c.symbolTable.Resolve(node.Value)
-		if !ok {
-			return fmt.Errorf("compiler error: undefined variable %s", node.Value)
-		}
+		symbol, _ := c.symbolTable.Resolve(node.Value)
 
 		reg, err := c.registerTable.alloc()
 		if err != nil {
@@ -132,7 +129,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		regName := c.registerTable.name(reg)
 
 		code := []string{
-			fmt.Sprintf("la %s, %s", regName, symbol.Name),
+			fmt.Sprintf("la %s, %s", regName, symbol.Code()),
 			fmt.Sprintf("ld %s, 0(%s)", regName, regName),
 		}
 

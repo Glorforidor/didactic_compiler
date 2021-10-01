@@ -119,6 +119,26 @@ func (vs *VarStatement) String() string {
 	return sb.String()
 }
 
+type AssignStatement struct {
+	Token token.Token // The token.Assign token.
+	Name  *Identifier
+	Value Expression
+}
+
+func (as *AssignStatement) statementNode()       {}
+func (as *AssignStatement) TokenLiteral() string { return as.Token.Literal }
+func (as *AssignStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(as.Name.String())
+	sb.WriteString(" ")
+	sb.WriteString(as.TokenLiteral())
+	sb.WriteString(" ")
+	sb.WriteString(as.Value.String())
+
+	return sb.String()
+}
+
 type Identifier struct {
 	Token token.Token // The token.Ident token.
 	Value string      // e.g. foo, bar, foobar

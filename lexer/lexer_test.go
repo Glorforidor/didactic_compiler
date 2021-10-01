@@ -14,6 +14,7 @@ func TestNextToken(t *testing.T) {
 	-/*+
 	var x int	
 	var y int = 2
+	x = 2
 `
 
 	tests := []struct {
@@ -36,6 +37,9 @@ func TestNextToken(t *testing.T) {
 		{token.Var, "var"},
 		{token.Ident, "y"},
 		{token.IntType, "int"},
+		{token.Assign, "="},
+		{token.Int, "2"},
+		{token.Ident, "x"},
 		{token.Assign, "="},
 		{token.Int, "2"},
 		{token.Eof, ""},

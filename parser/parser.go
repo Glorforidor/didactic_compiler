@@ -128,6 +128,10 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.Var:
 		return p.parseVarStatement()
 	default:
+		if p.curToken.Type == token.Ident && p.peekTokenIs(token.Assign) {
+			return p.parseAssignStatement()
+		}
+
 		return p.parseExpressionStatement()
 	}
 }
@@ -177,6 +181,20 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 		stmt.Value = p.parseExpression(Lowest)
 	}
+
+	return stmt
+}
+
+func (p *Parser) parseAssignStatement() *ast.AssignStatement {
+	stmt := &ast.AssignStatement{}
+	// current token is on the identifier
+	stmt.Name = p.parseExpression(Lowest).(*ast.Identifier)
+
+	p.nextToken() // advance to the "="
+	stmt.Token = p.curToken
+
+	p.nextToken() // advance to the value
+	stmt.Value = p.parseExpression(Lowest)
 
 	return stmt
 }

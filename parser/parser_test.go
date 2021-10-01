@@ -28,6 +28,8 @@ func checkParserError(t *testing.T, p *Parser) {
 }
 
 func checkProgramLength(t *testing.T, program *ast.Program) {
+	t.Helper()
+
 	if len(program.Statements) != 1 {
 		t.Fatalf(
 			"program.Statements does not contain 1 statement. got=%d",
@@ -122,7 +124,47 @@ func TestVarStatement(t *testing.T) {
 	}
 }
 
+func TestAssignStatement(t *testing.T) {
+	tests := []struct {
+		input              string
+		expectedIdentifier string
+		expectedValue      interface{}
+	}{
+		{"x = 2", "x", 2},
+		{"x = 3.0", "x", 3.0},
+		{`x = "Hello world`, "x", "Hello world"},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserError(t, p)
+
+		checkProgramLength(t, program)
+
+		stmt := program.Statements[0]
+		if stmt.TokenLiteral() != "=" {
+			t.Fatalf("stmt.TokenLiteral not %q. got=%q", "=", stmt.TokenLiteral())
+		}
+
+		assignStmt, ok := stmt.(*ast.AssignStatement)
+		if !ok {
+			t.Fatalf("stmt not *ast.AssignStatement, got=%T", stmt)
+		}
+
+		if assignStmt.Name.Value != tt.expectedIdentifier {
+			t.Fatalf(
+				"assignStmt.Name.Value not %q, got=%q",
+				tt.expectedIdentifier, assignStmt.Name.Value,
+			)
+		}
+
+		testLiteralExpression(t, assignStmt.Value, tt.expectedValue)
+	}
+}
 func TestInfixExpressions(t *testing.T) {
+
 	tests := []struct {
 		input      string
 		leftValue  interface{}

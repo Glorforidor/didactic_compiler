@@ -97,7 +97,6 @@ li a7, 1
 ecall`,
 		},
 	}
-
 	runCompilerTests(t, tests)
 }
 
@@ -112,7 +111,7 @@ x: .dword 0
 		{
 			input: "var x string",
 			expected: `.data
-x: .string ""
+x: .dword 0
 .text`,
 		},
 		{
@@ -127,8 +126,55 @@ x`,
 			expected: `.data
 x: .dword 0
 .text
+la t0, x`,
+		},
+		{
+			input: "var x int = 2",
+			expected: `.data
+x: .dword 0
+.text
 la t0, x
-ld t0, 0(t0)`,
+li t1, 2
+sd t1, 0(t0)`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
+func TestAssignStatement(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `var x int
+x = 2`,
+			expected: `.data
+x: .dword 0
+.text
+la t0, x
+li t1, 2
+sd t1, 0(t0)`,
+		},
+		{
+			input: `var x float
+x = 2.0`,
+			expected: `.data
+x: .double 0
+.L1: .double 2
+.text
+la t0, x
+fld ft0, .L1, t1
+fsd ft0, 0(t0)`,
+		},
+		{
+			input: `var x string
+x = "Hello Compiler World"`,
+			expected: `.data
+x: .dword 0
+.L1: .string "Hello Compiler World"
+.text
+la t0, x
+la t1, .L1
+sd t1, 0(t0)`,
 		},
 	}
 

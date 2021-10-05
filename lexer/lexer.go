@@ -110,7 +110,7 @@ func isDigit(ch byte) bool {
 // readIdentifier reads an identifier from l.input.
 func (l *Lexer) readIdentifier() string {
 	position := l.position
-	for isLetter(l.ch) {
+	for isLetter(l.ch) || isDigit(l.ch) {
 		l.readChar()
 	}
 

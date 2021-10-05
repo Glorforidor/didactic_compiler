@@ -13,6 +13,7 @@ func TestNextToken(t *testing.T) {
 	print 0.42
 	-/*+
 	var x int	
+	var x2 int
 	var y int = 2
 	x = 2
 `
@@ -33,6 +34,9 @@ func TestNextToken(t *testing.T) {
 		{token.Plus, "+"},
 		{token.Var, "var"},
 		{token.Ident, "x"},
+		{token.IntType, "int"},
+		{token.Var, "var"},
+		{token.Ident, "x2"},
 		{token.IntType, "int"},
 		{token.Var, "var"},
 		{token.Ident, "y"},

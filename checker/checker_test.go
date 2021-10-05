@@ -57,9 +57,33 @@ func TestVarStatement(t *testing.T) {
 			expectedToErr: false,
 		},
 		{
-			input:         "var x int = 1",
+			input:         "var x float = 1.0",
+			expectedType:  types.Type{Kind: types.Float},
+			expectedToErr: false,
+		},
+		{
+			input:         `var x string = "Hello World"`,
+			expectedType:  types.Type{Kind: types.String},
+			expectedToErr: false,
+		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
+func TestAssignStatement(t *testing.T) {
+	tests := []checkerTest{
+		{
+			input: `var x int
+x = 2`,
 			expectedType:  types.Type{Kind: types.Int},
 			expectedToErr: false,
+		},
+		{
+			input: `var x int
+x = 2.5`,
+			expectedType:  types.Type{Kind: types.Int},
+			expectedToErr: true,
 		},
 	}
 
@@ -109,11 +133,14 @@ func TestArithmetic(t *testing.T) {
 }
 
 func runCheckerTests(t *testing.T, tests []checkerTest) {
+	t.Helper()
 	for _, tt := range tests {
 		l := lexer.New(tt.input)
 		p := parser.New(l)
 		program := p.ParseProgram()
 		resolver.Resolve(program, symbol.NewTable())
+
+		t.Logf("Program: %v", program.String())
 
 		if err := Check(program); err != nil {
 			if !tt.expectedToErr {
@@ -123,7 +150,7 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 			continue
 		}
 
-		t.Logf("Program: %s", program.String())
+		t.Logf("Typed Program: %v", program.String())
 
 		for _, s := range program.Statements {
 			switch s := s.(type) {
@@ -132,13 +159,22 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 					t.Fatalf("added wrong type: expected=%s, got=%s", tt.expectedType, s.Value.Type())
 				}
 			case *ast.VarStatement:
+				if s.Name.T != tt.expectedType {
+					t.Fatalf(
+						"variable was defined with the wrong type. expected=%s, got=%s",
+						tt.expectedType, s.Name.T.Kind)
+				}
+
 				if s.Value != nil {
-					if s.Value.Type() != tt.expectedType {
-						t.Fatalf("added wrong type: expected=%s, got=%s", tt.expectedType, s.Value.Type())
-					}
 					if s.Name.Type() != s.Value.Type() {
 						t.Fatalf("allowed to add type: %s to an identifier with type: %s", s.Value.Type(), s.Name.Type())
 					}
+				}
+			case *ast.AssignStatement:
+				if s.Name.T != tt.expectedType {
+					t.Fatalf(
+						"variable in assignment have unexpected type. expected=%s, got=%s",
+						tt.expectedType, s.Name.T.Kind)
 				}
 			case *ast.ExpressionStatement:
 				switch e := s.Expression.(type) {

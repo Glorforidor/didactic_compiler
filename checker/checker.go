@@ -49,6 +49,23 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				node.Value.Type().Kind,
 			)
 		}
+	case *ast.AssignStatement:
+		if err := check(node.Name, symbolTable); err != nil {
+			return err
+		}
+
+		if err := check(node.Value, symbolTable); err != nil {
+			return err
+		}
+
+		if node.Name.T != node.Value.Type() {
+			return fmt.Errorf(
+				"type error: can not assign %q of type %s with a value of type %s",
+				node.Name.Value,
+				node.Name.T.Kind,
+				node.Value.Type().Kind,
+			)
+		}
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
 		if sym.Type.Kind == types.Unknown {
@@ -68,6 +85,8 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		lt := node.Left.Type()
 		rt := node.Right.Type()
 
+		// TODO: also check that the types are not strings, since we do not
+		// allow string concatination.
 		if lt != rt {
 			return fmt.Errorf("type error: mismatch of types %s and %s", lt.Kind, rt.Kind)
 		}

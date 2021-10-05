@@ -84,7 +84,7 @@ func (p *Parser) expectPeek(ts ...token.TokenType) bool {
 	if len(ts) == 1 {
 		p.errorf("expected next token to be %s, got: %s", ts, p.peekToken.Type)
 	} else {
-		p.errorf("expected next token to be on of %v, got: %s", ts, p.peekToken.Type)
+		p.errorf("expected next token to be one of %v, got: %s", ts, p.peekToken.Type)
 	}
 	return false
 }

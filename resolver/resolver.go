@@ -24,7 +24,14 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 	case *ast.VarStatement:
+		if err := Resolve(node.Value, symbolTable); err != nil {
+			return err
+		}
 		if _, err := symbolTable.Define(node.Name.Value, node.Name.T); err != nil {
+			return err
+		}
+	case *ast.AssignStatement:
+		if err := Resolve(node.Name, symbolTable); err != nil {
 			return err
 		}
 	case *ast.Identifier:

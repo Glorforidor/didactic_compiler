@@ -43,6 +43,15 @@ x`,
 var x int`,
 			expectedToErr: true,
 		},
+		{
+			input:         `x = 2`,
+			expectedToErr: true,
+		},
+		{
+			input: `var x int
+x = 2`,
+			expectedToErr: false,
+		},
 	}
 
 	for _, tt := range tests {

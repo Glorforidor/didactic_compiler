@@ -7,6 +7,10 @@ type register struct {
 	inuse bool
 }
 
+func (r *register) String() string {
+	return r.name
+}
+
 type registerTable []*register
 
 func (rt registerTable) alloc() (int, error) {
@@ -17,7 +21,7 @@ func (rt registerTable) alloc() (int, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("no more register available")
+	return 0, fmt.Errorf("no more register available: %v", rt)
 }
 
 func (rt registerTable) dealloc(reg int) {

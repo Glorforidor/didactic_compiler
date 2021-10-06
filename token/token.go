@@ -24,6 +24,10 @@ const (
 	Slash    TokenType = "/"
 	Assign   TokenType = "="
 
+	// Grouping
+	Lparen TokenType = "("
+	Rparen TokenType = ")"
+
 	// Keywords
 	Print      TokenType = "PRINT"
 	Var        TokenType = "VAR"

@@ -277,6 +277,16 @@ add t0, t0, t1
 li t1, 2
 sub t0, t0, t1`,
 		},
+		{
+			input: "(5 + 5) / 5",
+			expected: `.data
+.text
+li t0, 5
+li t1, 5
+add t0, t0, t1
+li t1, 5
+div t0, t0, t1`,
+		},
 	}
 
 	runCompilerTests(t, tests)

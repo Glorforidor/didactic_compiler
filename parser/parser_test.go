@@ -213,6 +213,10 @@ func TestOperatorPrecedence(t *testing.T) {
 			input:    "5 + 5 / 2 * 3 - 2",
 			expected: "((5 + ((5 / 2) * 3)) - 2)",
 		},
+		{
+			input:    "5 * (5 + 5) / 5",
+			expected: "((5 * (5 + 5)) / 5)",
+		},
 	}
 
 	for _, tt := range tests {

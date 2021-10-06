@@ -46,6 +46,9 @@ func New(l *lexer.Lexer) *Parser {
 	// register identifier
 	p.registerPrefixFunc(token.Ident, p.parseIdentifier)
 
+	// register grouping
+	p.registerPrefixFunc(token.Lparen, p.parseGroupedExpression)
+
 	// register operators
 	p.registerInfixFunc(token.Plus, p.parseInfixExpression)
 	p.registerInfixFunc(token.Minus, p.parseInfixExpression)
@@ -280,6 +283,18 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 	expression.Right = p.parseExpression(precedence)
 
 	return expression
+}
+
+func (p *Parser) parseGroupedExpression() ast.Expression {
+	p.nextToken() // advance beyound the "("
+
+	exp := p.parseExpression(Lowest)
+
+	if !p.expectPeek(token.Rparen) {
+		return nil
+	}
+
+	return exp
 }
 
 func (p *Parser) parseIntegerLiteral() ast.Expression {

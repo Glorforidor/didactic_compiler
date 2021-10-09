@@ -20,6 +20,12 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				return err
 			}
 		}
+	case *ast.BlockStatement:
+		for _, s := range node.Statements {
+			if err := check(s, node.SymbolTable); err != nil {
+				return err
+			}
+		}
 	case *ast.ExpressionStatement:
 		if err := check(node.Expression, symbolTable); err != nil {
 			return err
@@ -43,9 +49,9 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 
 		if node.Name.T != node.Value.Type() {
 			return fmt.Errorf(
-				"type error: identifier: %s of type: %s is assigned the wrong type: %s",
+				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name.Value,
-				node.Name.Type().Kind,
+				node.Name.T.Kind,
 				node.Value.Type().Kind,
 			)
 		}
@@ -60,7 +66,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 
 		if node.Name.T != node.Value.Type() {
 			return fmt.Errorf(
-				"type error: can not assign %q of type %s with a value of type %s",
+				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name.Value,
 				node.Name.T.Kind,
 				node.Value.Type().Kind,
@@ -85,10 +91,12 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		lt := node.Left.Type()
 		rt := node.Right.Type()
 
-		// TODO: also check that the types are not strings, since we do not
-		// allow string concatination.
 		if lt != rt {
 			return fmt.Errorf("type error: mismatch of types %s and %s", lt.Kind, rt.Kind)
+		}
+
+		if lt.Kind == types.String {
+			return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt)
 		}
 
 		node.T = lt

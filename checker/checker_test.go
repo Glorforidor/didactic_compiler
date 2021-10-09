@@ -115,6 +115,36 @@ x`,
 	runCheckerTests(t, tests)
 }
 
+func TestBlockStatement(t *testing.T) {
+	// TODO: Write better tests for Block statements so testing that a variable
+	// with the same name in different blocks can have different types.
+	tests := []checkerTest{
+		{
+			input: `{
+var x int
+}`,
+			expectedType:  types.Type{Kind: types.Int},
+			expectedToErr: false,
+		},
+		{
+			input: `{
+	var x float
+}`,
+			expectedType:  types.Type{Kind: types.Float},
+			expectedToErr: false,
+		},
+		{
+			input: `{
+	var x string
+}`,
+			expectedType:  types.Type{Kind: types.String},
+			expectedToErr: false,
+		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
 func TestArithmetic(t *testing.T) {
 	tests := []checkerTest{
 		{
@@ -124,6 +154,11 @@ func TestArithmetic(t *testing.T) {
 		},
 		{
 			input:         `2.0 + 2`,
+			expectedType:  types.Type{},
+			expectedToErr: true,
+		},
+		{
+			input:         `"Hello" + "World"`,
 			expectedType:  types.Type{},
 			expectedToErr: true,
 		},
@@ -152,38 +187,48 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 
 		t.Logf("Typed Program: %v", program.String())
 
-		for _, s := range program.Statements {
-			switch s := s.(type) {
+		var testing func(node ast.Node)
+		testing = func(node ast.Node) {
+			switch node := node.(type) {
+			case *ast.Program:
+				for _, s := range node.Statements {
+					testing(s)
+				}
+			case *ast.BlockStatement:
+				for _, s := range node.Statements {
+					testing(s)
+				}
 			case *ast.PrintStatement:
-				if s.Value.Type() != tt.expectedType {
-					t.Fatalf("added wrong type: expected=%s, got=%s", tt.expectedType, s.Value.Type())
+				if node.Value.Type() != tt.expectedType {
+					t.Fatalf("added wrong type: expected=%s, got=%s", tt.expectedType, node.Value.Type())
 				}
 			case *ast.VarStatement:
-				if s.Name.T != tt.expectedType {
+				if node.Name.T != tt.expectedType {
 					t.Fatalf(
 						"variable was defined with the wrong type. expected=%s, got=%s",
-						tt.expectedType, s.Name.T.Kind)
+						tt.expectedType, node.Name.T.Kind)
 				}
 
-				if s.Value != nil {
-					if s.Name.Type() != s.Value.Type() {
-						t.Fatalf("allowed to add type: %s to an identifier with type: %s", s.Value.Type(), s.Name.Type())
+				if node.Value != nil {
+					if node.Name.Type() != node.Value.Type() {
+						t.Fatalf("allowed to add type: %s to an identifier with type: %s", node.Value.Type(), node.Name.Type())
 					}
 				}
 			case *ast.AssignStatement:
-				if s.Name.T != tt.expectedType {
+				if node.Name.T != tt.expectedType {
 					t.Fatalf(
 						"variable in assignment have unexpected type. expected=%s, got=%s",
-						tt.expectedType, s.Name.T.Kind)
+						tt.expectedType, node.Name.T.Kind)
 				}
 			case *ast.ExpressionStatement:
-				switch e := s.Expression.(type) {
-				case *ast.Identifier:
-					if e.T != tt.expectedType {
-						t.Fatalf("identified wrong type.")
-					}
+				testing(node.Expression)
+			case *ast.Identifier:
+				if node.T != tt.expectedType {
+					t.Fatalf("identified wrong type.")
 				}
 			}
 		}
+
+		testing(program)
 	}
 }

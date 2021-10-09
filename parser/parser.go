@@ -130,6 +130,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parsePrintStatement()
 	case token.Var:
 		return p.parseVarStatement()
+	case token.Lbrace:
+		return p.parseBlockStatement()
 	default:
 		if p.curToken.Type == token.Ident && p.peekTokenIs(token.Assign) {
 			return p.parseAssignStatement()
@@ -200,6 +202,27 @@ func (p *Parser) parseAssignStatement() *ast.AssignStatement {
 	stmt.Value = p.parseExpression(Lowest)
 
 	return stmt
+}
+
+func (p *Parser) parseBlockStatement() *ast.BlockStatement {
+	block := &ast.BlockStatement{Token: p.curToken}
+
+	p.nextToken() // advance beyond "{"
+
+	for !p.curTokenIs(token.Rbrace) && !p.curTokenIs(token.Eof) {
+		stmt := p.parseStatement()
+		if stmt != nil {
+			block.Statements = append(block.Statements, stmt)
+		}
+
+		p.nextToken()
+	}
+
+	if p.curTokenIs(token.Eof) {
+		p.errorf("parser error: block statement was never closed")
+	}
+
+	return block
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {

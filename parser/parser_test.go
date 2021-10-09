@@ -163,8 +163,52 @@ func TestAssignStatement(t *testing.T) {
 		testLiteralExpression(t, assignStmt.Value, tt.expectedValue)
 	}
 }
-func TestInfixExpressions(t *testing.T) {
 
+func TestBlockStatement(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectedSize int
+	}{
+		{
+			input:        "{var x int = 2}",
+			expectedSize: 1,
+		},
+		{
+			input: `{
+var x int = 2
+var y int = 2
+print x + y
+}`,
+			expectedSize: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserError(t, p)
+
+		checkProgramLength(t, program)
+
+		stmt := program.Statements[0]
+		if stmt.TokenLiteral() != "{" {
+			t.Fatalf("stmt.TokenLiteral not %q. got=%q", "=", stmt.TokenLiteral())
+		}
+
+		blockStmt, ok := stmt.(*ast.BlockStatement)
+		if !ok {
+			t.Fatalf("stmt not *ast.BlockStatement, got=%T", stmt)
+		}
+
+		if len(blockStmt.Statements) != tt.expectedSize {
+			t.Fatalf("blockStmt.Statements had the wrong size. expected=%v, got=%v",
+				tt.expectedSize, len(blockStmt.Statements))
+		}
+	}
+}
+
+func TestInfixExpressions(t *testing.T) {
 	tests := []struct {
 		input      string
 		leftValue  interface{}

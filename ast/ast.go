@@ -139,6 +139,26 @@ func (as *AssignStatement) String() string {
 	return sb.String()
 }
 
+type BlockStatement struct {
+	Token       token.Token // The token.Lcurly token.
+	Statements  []Statement
+	SymbolTable *symbol.Table
+}
+
+func (bs *BlockStatement) statementNode()       {}
+func (bs *BlockStatement) TokenLiteral() string { return bs.Token.Literal }
+func (bs *BlockStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("{")
+	for _, s := range bs.Statements {
+		sb.WriteString(s.String())
+	}
+	sb.WriteString("}")
+
+	return sb.String()
+}
+
 type Identifier struct {
 	Token token.Token // The token.Ident token.
 	Value string      // e.g. foo, bar, foobar

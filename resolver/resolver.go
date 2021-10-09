@@ -10,15 +10,21 @@ import (
 func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 	switch node := node.(type) {
 	case *ast.Program:
+		node.SymbolTable = symbolTable
+
 		for _, s := range node.Statements {
-			if err := Resolve(s, symbolTable); err != nil {
+			if err := Resolve(s, node.SymbolTable); err != nil {
 				return err
 			}
 		}
+	case *ast.BlockStatement:
+		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
 
-		// When reaching here the symbol table should be the outer most, which
-		// is the table with global definitions.
-		node.SymbolTable = symbolTable
+		for _, s := range node.Statements {
+			if err := Resolve(s, node.SymbolTable); err != nil {
+				return err
+			}
+		}
 	case *ast.ExpressionStatement:
 		if err := Resolve(node.Expression, symbolTable); err != nil {
 			return err

@@ -52,6 +52,28 @@ var x int`,
 x = 2`,
 			expectedToErr: false,
 		},
+		{
+			input: `var x int
+{
+	var x int
+}`,
+			expectedToErr: false,
+		},
+		{
+			input: `var x int
+{
+	var x float
+}`,
+			expectedToErr: false,
+		},
+		{
+			input: `var x int
+{
+	var x int
+	var x float
+}`,
+			expectedToErr: true,
+		},
 	}
 
 	for _, tt := range tests {

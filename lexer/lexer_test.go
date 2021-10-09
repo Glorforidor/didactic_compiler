@@ -17,6 +17,7 @@ func TestNextToken(t *testing.T) {
 	var x2 int
 	var y int = 2
 	x = 2
+	{}
 `
 
 	tests := []struct {
@@ -52,6 +53,8 @@ func TestNextToken(t *testing.T) {
 		{token.Ident, "x"},
 		{token.Assign, "="},
 		{token.Int, "2"},
+		{token.Lbrace, "{"},
+		{token.Rbrace, "}"},
 		{token.Eof, ""},
 	}
 

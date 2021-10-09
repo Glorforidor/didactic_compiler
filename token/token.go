@@ -27,6 +27,8 @@ const (
 	// Grouping
 	Lparen TokenType = "("
 	Rparen TokenType = ")"
+	Lbrace TokenType = "{"
+	Rbrace TokenType = "}"
 
 	// Keywords
 	Print      TokenType = "PRINT"

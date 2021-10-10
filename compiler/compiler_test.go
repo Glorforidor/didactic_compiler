@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
@@ -28,73 +29,81 @@ func TestPrintStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
 			input: "print 42",
-			expected: `.data
-.text
-li t0, 42
-mv a0, t0
-li a7, 1
-ecall`,
+			expected: `
+			.data
+			.text
+			li t0, 42
+			mv a0, t0
+			li a7, 1
+			ecall`,
 		},
 		{
-			input: `print 42
-print 43`,
-			expected: `.data
-.text
-li t0, 42
-mv a0, t0
-li a7, 1
-ecall
-li t0, 43
-mv a0, t0
-li a7, 1
-ecall`,
+			input: `
+			print 42
+			print 43`,
+			expected: `
+			.data
+			.text
+			li t0, 42
+			mv a0, t0
+			li a7, 1
+			ecall
+			li t0, 43
+			mv a0, t0
+			li a7, 1
+			ecall`,
 		},
 		{
 			input: `print "Hello World"`,
-			expected: `.data
-.L1: .string "Hello World"
-.text
-la t0, .L1
-mv a0, t0
-li a7, 4
-ecall`,
+			expected: `
+			.data
+			.L1: .string "Hello World"
+			.text
+			la t0, .L1
+			mv a0, t0
+			li a7, 4
+			ecall`,
 		},
 		{
-			input: `print "Hello World"
-print "Hello Peeps"`,
-			expected: `.data
-.L1: .string "Hello World"
-.L2: .string "Hello Peeps"
-.text
-la t0, .L1
-mv a0, t0
-li a7, 4
-ecall
-la t0, .L2
-mv a0, t0
-li a7, 4
-ecall`,
+			input: `
+			print "Hello World"
+			print "Hello Peeps"`,
+			expected: `
+			.data
+			.L1: .string "Hello World"
+			.L2: .string "Hello Peeps"
+			.text
+			la t0, .L1
+			mv a0, t0
+			li a7, 4
+			ecall
+			la t0, .L2
+			mv a0, t0
+			li a7, 4
+			ecall`,
 		},
 		{
 			input: `print 42.1`,
-			expected: `.data
-.L1: .double 42.1
-.text
-fld ft0, .L1, t0
-fmv.d fa0, ft0
-li a7, 3
-ecall`,
+			expected: `
+			.data
+			.L1: .double 42.1
+			.text
+			fld ft0, .L1, t0
+			fmv.d fa0, ft0
+			li a7, 3
+			ecall`,
 		},
 		{
-			input: `print 2 + 2`,
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-add t0, t0, t1
-mv a0, t0
-li a7, 1
-ecall`,
+			input: "print 2 + 2",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			add t0, t0, t1
+			mv a0, t0
+			li a7, 1
+			ecall`,
 		},
 	}
 	runCompilerTests(t, tests)
@@ -104,38 +113,44 @@ func TestVarStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
 			input: "var x int",
-			expected: `.data
-x: .dword 0
-.text`,
+			expected: `
+			.data
+			x: .dword 0
+			.text`,
 		},
 		{
 			input: "var x string",
-			expected: `.data
-x: .dword 0
-.text`,
+			expected: `
+			.data
+			x: .dword 0
+			.text`,
 		},
 		{
 			input: "var x float",
-			expected: `.data
-x: .double 0
-.text`,
+			expected: `
+			.data
+			x: .double 0
+			.text`,
 		},
 		{
-			input: `var x int
-x`,
-			expected: `.data
-x: .dword 0
-.text
-la t0, x`,
+			input: `
+			var x int
+			x`,
+			expected: `
+			.data
+			x: .dword 0
+			.text
+			la t0, x`,
 		},
 		{
 			input: "var x int = 2",
-			expected: `.data
-x: .dword 0
-.text
-la t0, x
-li t1, 2
-sd t1, 0(t0)`,
+			expected: `
+			.data
+			x: .dword 0
+			.text
+			la t0, x
+			li t1, 2
+			sd t1, 0(t0)`,
 		},
 	}
 
@@ -145,36 +160,123 @@ sd t1, 0(t0)`,
 func TestAssignStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
-			input: `var x int
-x = 2`,
-			expected: `.data
-x: .dword 0
-.text
-la t0, x
-li t1, 2
-sd t1, 0(t0)`,
+			input: `
+			var x int
+			x = 2
+			`,
+			expected: `
+			.data
+			x: .dword 0
+			.text
+			la t0, x
+			li t1, 2
+			sd t1, 0(t0)`,
 		},
 		{
-			input: `var x float
-x = 2.0`,
-			expected: `.data
-x: .double 0
-.L1: .double 2
-.text
-la t0, x
-fld ft0, .L1, t1
-fsd ft0, 0(t0)`,
+			input: `
+			var x float
+			x = 2.0
+			`,
+			expected: `
+			.data
+			x: .double 0
+			.L1: .double 2
+			.text
+			la t0, x
+			fld ft0, .L1, t1
+			fsd ft0, 0(t0)`,
 		},
 		{
-			input: `var x string
-x = "Hello Compiler World"`,
-			expected: `.data
-x: .dword 0
-.L1: .string "Hello Compiler World"
-.text
-la t0, x
-la t1, .L1
-sd t1, 0(t0)`,
+			input: `
+			var x string
+			x = "Hello Compiler World"
+			`,
+			expected: `
+			.data
+			x: .dword 0
+			.L1: .string "Hello Compiler World"
+			.text
+			la t0, x
+			la t1, .L1
+			sd t1, 0(t0)`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
+func TestBlockStatement(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `
+			{
+				var x int
+			}`,
+			expected: `
+			.data
+			.text
+			addi sp, sp, -16
+			addi sp, sp, 16`,
+		},
+		{
+			input: `
+			{
+				var x float
+			}`,
+			expected: `
+			.data
+			.text
+			addi sp, sp, -16
+			addi sp, sp, 16`,
+		},
+		{
+			input: `
+			{
+				var x int = 2
+			}`,
+			expected: `
+			.data
+			.text
+			addi sp, sp, -16
+			ld t0, 0(sp)
+			li t1, 2
+			sd t1, 0(sp)
+			addi sp, sp, 16`,
+		},
+		{
+			input: `
+			{
+				var x string = "Hello Block statement"
+			}`,
+			expected: `
+			.data
+			.L1: .string "Hello Block statement"
+			.text
+			addi sp, sp, -16
+			ld t0, 0(sp)
+			la t1, .L1
+			sd t1, 0(sp)
+			addi sp, sp, 16`,
+		},
+		{
+			input: `
+			{
+				var x int
+				var y float = 32.0
+				x = 2
+			}`,
+			expected: `
+			.data
+			.L1: .double 32
+			.text
+			addi sp, sp, -16
+			fld ft0, 8(sp)
+			fld ft1, .L1, t0
+			fsd ft1, 8(sp)
+			ld t0, 0(sp)
+			li t1, 2
+			sd t1, 0(sp)
+			addi sp, sp, 16`,
 		},
 	}
 
@@ -184,108 +286,120 @@ sd t1, 0(t0)`,
 func TestArithmetic(t *testing.T) {
 	tests := []compilerTest{
 		{
-			input: `2 + 2`,
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-add t0, t0, t1`,
+			input: "2 + 2",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			add t0, t0, t1`,
 		},
 		{
 			input: `2 + 2
-3 + 3`,
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-add t0, t0, t1
-li t0, 3
-li t1, 3
-add t0, t0, t1`,
+					3 + 3`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			add t0, t0, t1
+			li t0, 3
+			li t1, 3
+			add t0, t0, t1`,
 		},
 		{
 			input: "2 - 2",
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-sub t0, t0, t1`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			sub t0, t0, t1`,
 		},
 		{
 			input: "2 * 2",
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-mul t0, t0, t1`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			mul t0, t0, t1`,
 		},
 		{
 			input: "2 / 2",
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-div t0, t0, t1`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			div t0, t0, t1`,
 		},
 		{
 			input: "2.1 + 2.1",
-			expected: `.data
-.L1: .double 2.1
-.L2: .double 2.1
-.text
-fld ft0, .L1, t0
-fld ft1, .L2, t0
-fadd.d ft0, ft0, ft1`,
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fadd.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 - 2.1",
-			expected: `.data
-.L1: .double 2.1
-.L2: .double 2.1
-.text
-fld ft0, .L1, t0
-fld ft1, .L2, t0
-fsub.d ft0, ft0, ft1`,
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fsub.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 * 2.1",
-			expected: `.data
-.L1: .double 2.1
-.L2: .double 2.1
-.text
-fld ft0, .L1, t0
-fld ft1, .L2, t0
-fmul.d ft0, ft0, ft1`,
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fmul.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2.1 / 2.1",
-			expected: `.data
-.L1: .double 2.1
-.L2: .double 2.1
-.text
-fld ft0, .L1, t0
-fld ft1, .L2, t0
-fdiv.d ft0, ft0, ft1`,
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fdiv.d ft0, ft0, ft1`,
 		},
 		{
 			input: "2 + 2 - 2",
-			expected: `.data
-.text
-li t0, 2
-li t1, 2
-add t0, t0, t1
-li t1, 2
-sub t0, t0, t1`,
+			expected: `
+				.data
+				.text
+				li t0, 2
+				li t1, 2
+				add t0, t0, t1
+				li t1, 2
+				sub t0, t0, t1
+			`,
 		},
 		{
 			input: "(5 + 5) / 5",
-			expected: `.data
-.text
-li t0, 5
-li t1, 5
-add t0, t0, t1
-li t1, 5
-div t0, t0, t1`,
+			expected: `
+			.data
+			.text
+			li t0, 5
+			li t1, 5
+			add t0, t0, t1
+			li t1, 5
+			div t0, t0, t1`,
 		},
 	}
 
@@ -294,6 +408,9 @@ div t0, t0, t1`,
 
 func runCompilerTests(t *testing.T, tests []compilerTest) {
 	t.Helper()
+
+	// replace all those pesky tabs and newlines from the raw strings.
+	replacer := strings.NewReplacer("\t", "", "\n", "")
 
 	for _, tt := range tests {
 		program := parse(tt.input)
@@ -305,8 +422,8 @@ func runCompilerTests(t *testing.T, tests []compilerTest) {
 		}
 
 		asm := comp.Asm()
-		if asm != tt.expected {
-			t.Fatalf("wrong assembly emitted.\nexpected=\n%q\ngot=\n%q", tt.expected, asm)
+		if replacer.Replace(asm) != replacer.Replace(tt.expected) {
+			t.Fatalf("wrong assembly emitted.\nexpected=\n%q\ngot=\n%q", replacer.Replace(tt.expected), replacer.Replace(asm))
 		}
 	}
 

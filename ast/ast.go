@@ -30,7 +30,7 @@ type Expression interface {
 	Node
 
 	// Register returns a register number.
-	Register() int
+	Register() string
 
 	// Type returns the expressions type.
 	Type() types.Type
@@ -162,12 +162,12 @@ func (bs *BlockStatement) String() string {
 type Identifier struct {
 	Token token.Token // The token.Ident token.
 	Value string      // e.g. foo, bar, foobar
-	Reg   int
+	Reg   string
 	T     types.Type
 }
 
 func (id *Identifier) expressionNode()      {}
-func (id *Identifier) Register() int        { return id.Reg }
+func (id *Identifier) Register() string     { return id.Reg }
 func (id *Identifier) Type() types.Type     { return id.T }
 func (id *Identifier) TokenLiteral() string { return id.Token.Literal }
 func (id *Identifier) String() string {
@@ -183,12 +183,12 @@ func (id *Identifier) String() string {
 type IntegerLiteral struct {
 	Token token.Token // The token.Int token.
 	Value int64
-	Reg   int
+	Reg   string
 	T     types.Type
 }
 
 func (il *IntegerLiteral) expressionNode()      {}
-func (il *IntegerLiteral) Register() int        { return il.Reg }
+func (il *IntegerLiteral) Register() string     { return il.Reg }
 func (il *IntegerLiteral) Type() types.Type     { return il.T }
 func (il *IntegerLiteral) TokenLiteral() string { return il.Token.Literal }
 func (il *IntegerLiteral) String() string       { return il.Token.Literal }
@@ -196,12 +196,12 @@ func (il *IntegerLiteral) String() string       { return il.Token.Literal }
 type FloatLiteral struct {
 	Token token.Token // The token.Float token.
 	Value float64
-	Reg   int
+	Reg   string
 	T     types.Type
 }
 
 func (fl *FloatLiteral) expressionNode()      {}
-func (fl *FloatLiteral) Register() int        { return fl.Reg }
+func (fl *FloatLiteral) Register() string     { return fl.Reg }
 func (fl *FloatLiteral) Type() types.Type     { return fl.T }
 func (fl *FloatLiteral) TokenLiteral() string { return fl.Token.Literal }
 func (fl *FloatLiteral) String() string       { return fl.Token.Literal }
@@ -209,12 +209,12 @@ func (fl *FloatLiteral) String() string       { return fl.Token.Literal }
 type StringLiteral struct {
 	Token token.Token // The token.String token.
 	Value string
-	Reg   int
+	Reg   string
 	T     types.Type
 }
 
 func (sl *StringLiteral) expressionNode()      {}
-func (sl *StringLiteral) Register() int        { return sl.Reg }
+func (sl *StringLiteral) Register() string     { return sl.Reg }
 func (sl *StringLiteral) Type() types.Type     { return sl.T }
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) String() string       { return sl.Token.Literal }
@@ -224,12 +224,12 @@ type InfixExpression struct {
 	Left     Expression
 	Operator string
 	Right    Expression
-	Reg      int
+	Reg      string
 	T        types.Type
 }
 
 func (ie *InfixExpression) expressionNode()      {}
-func (ie *InfixExpression) Register() int        { return ie.Reg }
+func (ie *InfixExpression) Register() string     { return ie.Reg }
 func (ie *InfixExpression) Type() types.Type     { return ie.T }
 func (ie *InfixExpression) TokenLiteral() string { return ie.Token.Literal }
 func (ie *InfixExpression) String() string {

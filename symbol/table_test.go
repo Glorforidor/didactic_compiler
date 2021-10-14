@@ -8,10 +8,10 @@ import (
 
 func TestDefine(t *testing.T) {
 	expected := map[string]Symbol{
-		"x": Symbol{Name: "x", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, Which: 0},
-		"y": Symbol{Name: "y", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, Which: 1},
-		"a": Symbol{Name: "a", Scope: LocalScope, Type: types.Type{Kind: types.Int}, Which: 0},
-		"b": Symbol{Name: "b", Scope: LocalScope, Type: types.Type{Kind: types.Int}, Which: 1},
+		"x": Symbol{Name: "x", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, which: 0},
+		"y": Symbol{Name: "y", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, which: 1},
+		"a": Symbol{Name: "a", Scope: LocalScope, Type: types.Type{Kind: types.Int}, which: 0},
+		"b": Symbol{Name: "b", Scope: LocalScope, Type: types.Type{Kind: types.Int}, which: 1},
 	}
 
 	global := NewTable()
@@ -45,8 +45,8 @@ func TestResolveGlobal(t *testing.T) {
 	global.Define("y", types.Type{Kind: types.Int})
 
 	expected := []Symbol{
-		Symbol{Name: "x", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, Which: 0},
-		Symbol{Name: "y", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, Which: 1},
+		Symbol{Name: "x", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, which: 0},
+		Symbol{Name: "y", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, which: 1},
 	}
 
 	for _, sym := range expected {
@@ -73,14 +73,51 @@ func TestResolveLocal(t *testing.T) {
 	local.Define("d", types.Type{Kind: types.Int})
 
 	expected := []Symbol{
-		Symbol{Name: "a", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, Which: 0},
-		Symbol{Name: "b", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, Which: 1},
-		Symbol{Name: "c", Scope: LocalScope, Type: types.Type{Kind: types.Int}, Which: 0},
-		Symbol{Name: "d", Scope: LocalScope, Type: types.Type{Kind: types.Int}, Which: 1},
+		Symbol{Name: "a", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 0},
+		Symbol{Name: "b", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 1},
+		Symbol{Name: "c", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 0},
+		Symbol{Name: "d", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 1},
 	}
 
 	for _, sym := range expected {
 		result, ok := local.Resolve(sym.Name)
+		if !ok {
+			t.Errorf("name %s not resolvable", sym.Name)
+			continue
+		}
+
+		if result != sym {
+			t.Errorf("expected %s to resolve to %+v, got=%+v", sym.Name, sym, result)
+		}
+	}
+}
+
+func TestResolveMultipleLocal(t *testing.T) {
+	global := NewTable()
+	global.Define("a", types.Type{Kind: types.Int})
+	global.Define("b", types.Type{Kind: types.Int})
+
+	local := NewEnclosedTable(global)
+	local.Define("c", types.Type{Kind: types.Int})
+	local.Define("d", types.Type{Kind: types.Int})
+
+	secondLocal := NewEnclosedTable(local)
+	secondLocal.Define("e", types.Type{Kind: types.Int})
+	secondLocal.Define("f", types.Type{Kind: types.Int})
+	secondLocal.Define("g", types.Type{Kind: types.Int})
+
+	expected := []Symbol{
+		Symbol{Name: "a", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 0},
+		Symbol{Name: "b", Scope: GlobalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 1},
+		Symbol{Name: "c", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 32, which: 0},
+		Symbol{Name: "d", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 32, which: 1},
+		Symbol{Name: "e", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 0},
+		Symbol{Name: "f", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 1},
+		Symbol{Name: "g", Scope: LocalScope, Type: types.Type{Kind: types.Int}, stackOffset: 0, which: 2},
+	}
+
+	for _, sym := range expected {
+		result, ok := secondLocal.Resolve(sym.Name)
 		if !ok {
 			t.Errorf("name %s not resolvable", sym.Name)
 			continue

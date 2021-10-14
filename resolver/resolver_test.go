@@ -57,12 +57,12 @@ x = 2`,
 {
 	var x int
 }`,
-			expectedToErr: false,
+			expectedToErr: true,
 		},
 		{
 			input: `var x int
 {
-	var x float
+	var x1 float
 }`,
 			expectedToErr: false,
 		},
@@ -73,6 +73,33 @@ x = 2`,
 	var x float
 }`,
 			expectedToErr: true,
+		},
+		{
+			input: `if 2 < 3 {
+				var x int
+			} else {
+				var y int
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `if 2 < 3 {
+				x = 2
+			} else {
+				y = 2.5
+			}`,
+			expectedToErr: true,
+		},
+		{
+			input: `
+			var x int
+			var y float
+			if 2 < 3 {
+				x = 2
+			} else {
+				y = 2.5
+			}`,
+			expectedToErr: false,
 		},
 	}
 

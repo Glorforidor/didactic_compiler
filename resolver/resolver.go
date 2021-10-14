@@ -25,6 +25,10 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 				return err
 			}
 		}
+	case *ast.PrintStatement:
+		if err := Resolve(node.Value, symbolTable); err != nil {
+			return err
+		}
 	case *ast.ExpressionStatement:
 		if err := Resolve(node.Expression, symbolTable); err != nil {
 			return err
@@ -40,10 +44,27 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if err := Resolve(node.Name, symbolTable); err != nil {
 			return err
 		}
+	case *ast.IfStatement:
+		if err := Resolve(node.Condition, symbolTable); err != nil {
+			return err
+		}
+		if err := Resolve(node.Consequence, symbolTable); err != nil {
+			return err
+		}
+		if err := Resolve(node.Alternative, symbolTable); err != nil {
+			return err
+		}
 	case *ast.Identifier:
 		_, ok := symbolTable.Resolve(node.Value)
 		if !ok {
 			return fmt.Errorf("resolver: identifier: %q is not defined", node.Value)
+		}
+	case *ast.InfixExpression:
+		if err := Resolve(node.Left, symbolTable); err != nil {
+			return err
+		}
+		if err := Resolve(node.Right, symbolTable); err != nil {
+			return err
 		}
 	}
 

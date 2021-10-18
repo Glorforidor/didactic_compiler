@@ -42,6 +42,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefixFunc(token.Int, p.parseIntegerLiteral)
 	p.registerPrefixFunc(token.Float, p.parseFloatLiteral)
 	p.registerPrefixFunc(token.String, p.parseStringLiteral)
+	p.registerPrefixFunc(token.True, p.parseBoolLiteral)
+	p.registerPrefixFunc(token.False, p.parseBoolLiteral)
 
 	// register identifier
 	p.registerPrefixFunc(token.Ident, p.parseIdentifier)
@@ -54,6 +56,9 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfixFunc(token.Minus, p.parseInfixExpression)
 	p.registerInfixFunc(token.Asterisk, p.parseInfixExpression)
 	p.registerInfixFunc(token.Slash, p.parseInfixExpression)
+	p.registerInfixFunc(token.Equal, p.parseInfixExpression)
+	p.registerInfixFunc(token.NotEqual, p.parseInfixExpression)
+	p.registerInfixFunc(token.LessThan, p.parseInfixExpression)
 
 	// Prime the parser, so curToken and peekToken are in the right positions.
 	p.nextToken()
@@ -132,6 +137,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseVarStatement()
 	case token.Lbrace:
 		return p.parseBlockStatement()
+	case token.If:
+		return p.parseIfStatement()
 	default:
 		if p.curToken.Type == token.Ident && p.peekTokenIs(token.Assign) {
 			return p.parseAssignStatement()
@@ -165,7 +172,7 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.IntType, token.FloatType, token.StringType) {
+	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType) {
 		return nil
 	}
 
@@ -176,6 +183,8 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 		id.T = types.Type{Kind: types.Float}
 	case token.StringType:
 		id.T = types.Type{Kind: types.String}
+	case token.BoolType:
+		id.T = types.Type{Kind: types.Bool}
 	}
 
 	stmt.Name = id
@@ -225,6 +234,32 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	return block
 }
 
+func (p *Parser) parseIfStatement() *ast.IfStatement {
+	stmt := &ast.IfStatement{Token: p.curToken}
+
+	p.nextToken()
+
+	stmt.Condition = p.parseExpression(Lowest)
+
+	if !p.expectPeek(token.Lbrace) {
+		return nil
+	}
+
+	stmt.Consequence = p.parseBlockStatement()
+
+	if p.peekTokenIs(token.Else) {
+		p.nextToken()
+
+		if !p.expectPeek(token.Lbrace) {
+			return nil
+		}
+
+		stmt.Alternative = p.parseBlockStatement()
+	}
+
+	return stmt
+}
+
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 	stmt.Expression = p.parseExpression(Lowest)
@@ -267,11 +302,16 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 const (
 	_ int = iota
 	Lowest
+	Equals  // ==
+	Less    // <
 	Sum     // +
 	Product // *
 )
 
 var precedences = map[token.TokenType]int{
+	token.Equal:    Equals,
+	token.NotEqual: Equals,
+	token.LessThan: Less,
 	token.Plus:     Sum,
 	token.Minus:    Sum,
 	token.Asterisk: Product,
@@ -351,6 +391,10 @@ func (p *Parser) parseFloatLiteral() ast.Expression {
 
 func (p *Parser) parseStringLiteral() ast.Expression {
 	return &ast.StringLiteral{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+func (p *Parser) parseBoolLiteral() ast.Expression {
+	return &ast.BoolLiteral{Token: p.curToken, Value: p.curTokenIs(token.True)}
 }
 
 func (p *Parser) parseIdentifier() ast.Expression {

@@ -159,6 +159,31 @@ func (bs *BlockStatement) String() string {
 	return sb.String()
 }
 
+type IfStatement struct {
+	Token       token.Token // The token.If token.
+	Condition   Expression
+	Consequence *BlockStatement
+	Alternative *BlockStatement
+}
+
+func (ifs *IfStatement) statementNode()       {}
+func (ifs *IfStatement) TokenLiteral() string { return ifs.Token.Literal }
+func (ifs *IfStatement) String() string {
+	var out strings.Builder
+
+	out.WriteString("if")
+	out.WriteString(ifs.Condition.String())
+	out.WriteString(" ")
+	out.WriteString(ifs.Consequence.String())
+
+	if ifs.Alternative != nil {
+		out.WriteString("else ")
+		out.WriteString(ifs.Alternative.String())
+	}
+
+	return out.String()
+}
+
 type Identifier struct {
 	Token token.Token // The token.Ident token.
 	Value string      // e.g. foo, bar, foobar
@@ -174,8 +199,8 @@ func (id *Identifier) String() string {
 	var sb strings.Builder
 
 	sb.WriteString(id.Value)
-	sb.WriteString(" ")
-	sb.WriteString(id.T.Kind.String())
+	// sb.WriteString(" ")
+	// sb.WriteString(id.T.Kind.String())
 
 	return sb.String()
 }
@@ -218,6 +243,19 @@ func (sl *StringLiteral) Register() string     { return sl.Reg }
 func (sl *StringLiteral) Type() types.Type     { return sl.T }
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
 func (sl *StringLiteral) String() string       { return sl.Token.Literal }
+
+type BoolLiteral struct {
+	Token token.Token // The token.Bool token.
+	Value bool
+	Reg   string
+	T     types.Type
+}
+
+func (bl *BoolLiteral) expressionNode()      {}
+func (bl *BoolLiteral) Register() string     { return bl.Reg }
+func (bl *BoolLiteral) Type() types.Type     { return bl.T }
+func (bl *BoolLiteral) TokenLiteral() string { return bl.Token.Literal }
+func (bl *BoolLiteral) String() string       { return bl.Token.Literal }
 
 type InfixExpression struct {
 	Token    token.Token // The operator token (+, -, /, *)

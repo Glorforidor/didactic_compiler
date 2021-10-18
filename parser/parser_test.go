@@ -85,9 +85,12 @@ func TestVarStatement(t *testing.T) {
 		{"var x int", "x", types.Type{types.Int}, nil},
 		{"var x float", "x", types.Type{types.Float}, nil},
 		{"var x string", "x", types.Type{types.String}, nil},
+		{"var x bool", "x", types.Type{types.Bool}, nil},
 		{"var x int = 1", "x", types.Type{types.Int}, 1},
 		{"var x float = 1.0", "x", types.Type{types.Float}, 1.0},
 		{`var x string = "Hello World"`, "x", types.Type{types.String}, "Hello World"},
+		{"var x bool = true", "x", types.Type{types.Bool}, true},
+		{"var x bool = false", "x", types.Type{types.Bool}, false},
 	}
 
 	for _, tt := range tests {
@@ -208,6 +211,72 @@ print x + y
 	}
 }
 
+func TestIfStatement(t *testing.T) {
+	input := `if x < y { x }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserError(t, p)
+
+	checkProgramLength(t, program)
+
+	ifstmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not an *ast.IfStatement. got=%T",
+			program.Statements[0])
+	}
+
+	testInfixExpression(t, ifstmt.Condition, "x", "<", "y")
+
+	consequence, ok := ifstmt.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("ifstmt.Consequence.Statements[0] is not an *ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	testIdentifier(t, consequence.Expression, "x")
+
+	if ifstmt.Alternative != nil {
+		t.Fatalf("ifstmt.Alternative was not nil. got=%+v", ifstmt.Alternative)
+	}
+}
+
+func TestIfStatementWithElse(t *testing.T) {
+	input := `if x < y { x } else { y }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserError(t, p)
+
+	checkProgramLength(t, program)
+
+	ifstmt, ok := program.Statements[0].(*ast.IfStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not an *ast.IfStatement. got=%T",
+			program.Statements[0])
+	}
+
+	testInfixExpression(t, ifstmt.Condition, "x", "<", "y")
+
+	consequence, ok := ifstmt.Consequence.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("ifstmt.Consequence.Statements[0] is not an *ast.ExpressionStatement. got=%T",
+			ifstmt.Consequence.Statements[0])
+	}
+
+	testIdentifier(t, consequence.Expression, "x")
+
+	alternative, ok := ifstmt.Alternative.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("ifstmt.Consequence.Statements[0] is not an *ast.ExpressionStatement. got=%T",
+			ifstmt.Alternative.Statements[0])
+	}
+
+	testIdentifier(t, alternative.Expression, "y")
+}
+
 func TestInfixExpressions(t *testing.T) {
 	tests := []struct {
 		input      string
@@ -219,6 +288,7 @@ func TestInfixExpressions(t *testing.T) {
 		{"5 - 5", 5, "-", 5},
 		{"5 * 5", 5, "*", 5},
 		{"5 / 5", 5, "/", 5},
+		{"x / 5", "x", "/", 5},
 	}
 
 	for _, tt := range tests {
@@ -260,6 +330,14 @@ func TestOperatorPrecedence(t *testing.T) {
 		{
 			input:    "5 * (5 + 5) / 5",
 			expected: "((5 * (5 + 5)) / 5)",
+		},
+		{
+			input:    "1 < 2 == true",
+			expected: "((1 < 2) == true)",
+		},
+		{
+			input:    "1 < 1 == false",
+			expected: "((1 < 1) == false)",
 		},
 	}
 
@@ -311,9 +389,32 @@ func testLiteralExpression(
 	case float64:
 		testFloatLiteral(t, expr, v)
 	case string:
-		testStringLiteral(t, expr, v)
+		if _, ok := expr.(*ast.Identifier); ok {
+			testIdentifier(t, expr, v)
+		} else {
+			testStringLiteral(t, expr, v)
+		}
+	case bool:
+		testBoolLiteral(t, expr, v)
 	default:
 		t.Fatalf("type of exp not handled. got=%T", expr)
+	}
+}
+
+func testIdentifier(t *testing.T, exp ast.Expression, value string) {
+	t.Helper()
+
+	ident, ok := exp.(*ast.Identifier)
+	if !ok {
+		t.Fatalf("exp not *ast.Identifier. got=%T", exp)
+	}
+
+	if ident.Value != value {
+		t.Fatalf("ident.Value is not %s. got=%s", value, ident.Value)
+	}
+
+	if ident.TokenLiteral() != value {
+		t.Fatalf("ident.TokentLiteral is not %s. got=%s", value, ident.TokenLiteral())
 	}
 }
 
@@ -372,5 +473,22 @@ func testStringLiteral(t *testing.T, sl ast.Expression, value string) {
 
 	if str.TokenLiteral() != fmt.Sprintf("%s", value) {
 		t.Fatalf("str.TokenLiteral is not %s. got=%s", value, str.TokenLiteral())
+	}
+}
+
+func testBoolLiteral(t *testing.T, bl ast.Expression, value bool) {
+	t.Helper()
+
+	bul, ok := bl.(*ast.BoolLiteral)
+	if !ok {
+		t.Fatalf("bl is not an *ast.BoolLiteral. got=%T", bl)
+	}
+
+	if bul.Value != value {
+		t.Fatalf("bul.Value is not %v. got=%v", value, bul.Value)
+	}
+
+	if bul.TokenLiteral() != fmt.Sprintf("%t", value) {
+		t.Fatalf("bul.TokenLiteral is not %t. got=%s", value, bul.TokenLiteral())
 	}
 }

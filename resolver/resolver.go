@@ -51,8 +51,11 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if err := Resolve(node.Consequence, symbolTable); err != nil {
 			return err
 		}
-		if err := Resolve(node.Alternative, symbolTable); err != nil {
-			return err
+
+		if node.Alternative != nil {
+			if err := Resolve(node.Alternative, symbolTable); err != nil {
+				return err
+			}
 		}
 	case *ast.Identifier:
 		_, ok := symbolTable.Resolve(node.Value)

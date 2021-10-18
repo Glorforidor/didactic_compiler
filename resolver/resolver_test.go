@@ -75,6 +75,13 @@ x = 2`,
 			expectedToErr: true,
 		},
 		{
+			input: `
+			if 2 < 3 {
+				print 2
+			}`,
+			expectedToErr: false,
+		},
+		{
 			input: `if 2 < 3 {
 				var x int
 			} else {

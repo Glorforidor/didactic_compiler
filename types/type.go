@@ -7,6 +7,7 @@ const (
 	Int
 	Float
 	String
+	Bool
 )
 
 type Type struct {
@@ -14,5 +15,5 @@ type Type struct {
 }
 
 func (k kind) String() string {
-	return [...]string{"unknown", "int", "float", "string"}[k]
+	return [...]string{"unknown", "int", "float", "string", "bool"}[k]
 }

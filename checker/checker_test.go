@@ -66,6 +66,11 @@ func TestVarStatement(t *testing.T) {
 			expectedType:  types.Type{Kind: types.String},
 			expectedToErr: false,
 		},
+		{
+			input:         `var x bool = false`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: false,
+		},
 	}
 
 	runCheckerTests(t, tests)
@@ -82,6 +87,12 @@ x = 2`,
 		{
 			input: `var x int
 x = 2.5`,
+			expectedType:  types.Type{Kind: types.Int},
+			expectedToErr: true,
+		},
+		{
+			input: `var x bool
+x = "True"`,
 			expectedType:  types.Type{Kind: types.Int},
 			expectedToErr: true,
 		},
@@ -108,6 +119,12 @@ x`,
 			input: `var x string
 x`,
 			expectedType:  types.Type{Kind: types.String},
+			expectedToErr: false,
+		},
+		{
+			input: `var x bool
+x`,
+			expectedType:  types.Type{Kind: types.Bool},
 			expectedToErr: false,
 		},
 	}
@@ -139,6 +156,99 @@ var x int
 }`,
 			expectedType:  types.Type{Kind: types.String},
 			expectedToErr: false,
+		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
+func TestIfStatement(t *testing.T) {
+	tests := []checkerTest{
+		{
+			input: `
+			if 2 < 2 {
+				print 2
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			if 2 < 3 {
+				print 20
+			} else {
+				print 30
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			if true {
+				print 20
+			} else {
+				print 30
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			if 1 {
+				print 20
+			}`,
+			expectedToErr: true,
+		},
+		{
+			input: `
+			if 1 + 1 {
+				print 20
+			}`,
+			expectedToErr: true,
+		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
+func TestComparsion(t *testing.T) {
+	tests := []checkerTest{
+		{
+			input:         `2 < 2`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: false,
+		},
+		{
+			input:         `2 == 2`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: false,
+		},
+		{
+			input:         `2 != 2`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: false,
+		},
+		{
+			input:         `2 < false`,
+			expectedType:  types.Type{},
+			expectedToErr: true,
+		},
+		{
+			input:         `2 < 3 == true`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: false,
+		},
+		{
+			input:         `2 < 3 == true`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: false,
+		},
+		{
+			input:         `true < true`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: true,
+		},
+		{
+			input:         `true < true`,
+			expectedType:  types.Type{Kind: types.Bool},
+			expectedToErr: true,
 		},
 	}
 
@@ -177,11 +287,12 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 
 		t.Logf("Program: %v", program.String())
 
-		if err := Check(program); err != nil {
-			if !tt.expectedToErr {
-				t.Fatalf("checker had errors which was not expected. got=%s", err)
-			}
-
+		err := Check(program)
+		if err != nil && !tt.expectedToErr {
+			t.Fatalf("checker had errors which was not expected. got=%q", err)
+		} else if err == nil && tt.expectedToErr {
+			t.Fatalf("checker was assumed to fail, but it did not.")
+		} else {
 			continue
 		}
 
@@ -206,7 +317,7 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 				if node.Name.T != tt.expectedType {
 					t.Fatalf(
 						"variable was defined with the wrong type. expected=%s, got=%s",
-						tt.expectedType, node.Name.T.Kind)
+						tt.expectedType.Kind, node.Name.T.Kind)
 				}
 
 				if node.Value != nil {

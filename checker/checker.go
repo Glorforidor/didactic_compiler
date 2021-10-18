@@ -72,6 +72,28 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				node.Value.Type().Kind,
 			)
 		}
+	case *ast.IfStatement:
+		if err := check(node.Condition, symbolTable); err != nil {
+			return err
+		}
+
+		if node.Condition.Type().Kind != types.Bool {
+			return fmt.Errorf(
+				"type error: non-bool %s (type %s) used as if condition",
+				node.Condition.String(),
+				node.Condition.Type().Kind,
+			)
+		}
+
+		if err := check(node.Consequence, symbolTable); err != nil {
+			return err
+		}
+
+		if node.Alternative != nil {
+			if err := check(node.Alternative, symbolTable); err != nil {
+				return err
+			}
+		}
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
 		if sym.Type.Kind == types.Unknown {
@@ -96,16 +118,29 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		}
 
 		if lt.Kind == types.String {
-			return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt)
+			return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt.Kind)
 		}
 
-		node.T = lt
+		switch node.Operator {
+		case "<":
+			if lt.Kind == types.Bool {
+				return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt.Kind)
+			}
+
+			node.T = types.Type{Kind: types.Bool}
+		case "==", "!=":
+			node.T = types.Type{Kind: types.Bool}
+		default:
+			node.T = lt
+		}
 	case *ast.IntegerLiteral:
 		node.T = types.Type{Kind: types.Int}
 	case *ast.FloatLiteral:
 		node.T = types.Type{Kind: types.Float}
 	case *ast.StringLiteral:
 		node.T = types.Type{Kind: types.String}
+	case *ast.BoolLiteral:
+		node.T = types.Type{Kind: types.Bool}
 	}
 
 	return nil

@@ -283,6 +283,174 @@ func TestBlockStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestIfStatement(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `
+			if 2 < 3 {
+				print 2
+			}`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 3
+			blt t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:
+			beqz t0, .L3
+			addi sp, sp, -0
+			li t0, 2
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			b .L4
+			.L3:
+			.L4:
+			`,
+		},
+		{
+			input: `
+			if 2 < 3 {
+				print 2
+			} else {
+				print 3
+			}`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 3
+			blt t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:
+			beqz t0, .L3
+			addi sp, sp, -0
+			li t0, 2
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			b .L4
+			.L3:
+			addi sp, sp, -0
+			li t0, 3
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			.L4:
+			`,
+		},
+		{
+			input: `
+			if 2 < 3 {
+				var x int = 2
+				print x
+			} else {
+				var x int = 3
+				print x
+			}`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 3
+			blt t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:
+			beqz t0, .L3
+			addi sp, sp, -16
+			ld t0, 0(sp)
+			li t1, 2
+			sd t1, 0(sp)
+			ld t0, 0(sp)
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 16
+			b .L4
+			.L3:
+			addi sp, sp, -16
+			ld t0, 0(sp)
+			li t1, 3
+			sd t1, 0(sp)
+			ld t0, 0(sp)
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 16
+			.L4:
+			`,
+		},
+		{
+			input: `
+			if 2 + 2 < 3 + 3 {
+				print 2
+			}`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			add t0, t0, t1
+			li t1, 3
+			li t2, 3
+			add t1, t1, t2
+			blt t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:
+			beqz t0, .L3
+			addi sp, sp, -0
+			li t0, 2
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			b .L4
+			.L3:
+			.L4:
+			`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
+func TestConditional(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: "2 < 3",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 3
+			blt t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestArithmetic(t *testing.T) {
 	tests := []compilerTest{
 		{

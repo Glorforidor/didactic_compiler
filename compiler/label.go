@@ -6,12 +6,8 @@ type label struct {
 	num int
 }
 
-// Create creates a new label.
-func (l *label) Create() {
+// create returns a unique assembly label name.
+func (l *label) create() string {
 	l.num++
-}
-
-// Name returns the assembly name of the label.
-func (l *label) Name() string {
 	return fmt.Sprintf(".L%d", l.num)
 }

@@ -2,12 +2,16 @@ package compiler
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/symbol"
 	"github.com/Glorforidor/didactic_compiler/types"
+)
+
+const (
+	cTrue  = 1
+	cFalse = 0
 )
 
 type Compiler struct {
@@ -25,12 +29,6 @@ func New() *Compiler {
 	}
 }
 
-func stackSpace(defs int) int {
-	x := math.Round(float64(defs) / 2)
-	y := x * 16
-	return int(y)
-}
-
 func (c *Compiler) Compile(node ast.Node) error {
 	switch node := node.(type) {
 	case *ast.Program:
@@ -42,7 +40,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 	case *ast.BlockStatement:
 		c.symbolTable = node.SymbolTable // enter scope
-		s := stackSpace(c.symbolTable.NumDefinitions)
+		s := node.SymbolTable.StackSpace()
 
 		// Begin of block
 		c.emit(fmt.Sprintf("addi sp, sp, -%d", s))
@@ -109,10 +107,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.registerTable.dealloc(node.Value.Register())
 		c.emit(code...)
 	case *ast.VarStatement:
-		sym, _ := c.symbolTable.Resolve(node.Name.Value)
+		s, _ := c.symbolTable.Resolve(node.Name.Value)
 
-		if sym.Scope == symbol.GlobalScope {
-			la, err := createASMLabelIdentifier(sym.Name, sym.Type)
+		if s.Scope == symbol.GlobalScope {
+			la, err := createASMLabelIdentifier(s.Name, s.Type)
 			if err != nil {
 				return err
 			}
@@ -137,6 +135,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 		}
 	case *ast.AssignStatement:
+		// TODO: maybe move this to into the global scope check?
+		// Otherwise we will emit an unnecessary load instruction for locals.
 		if err := c.Compile(node.Name); err != nil {
 			return err
 		}
@@ -166,6 +166,34 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.registerTable.dealloc(node.Value.Register())
 		c.registerTable.dealloc(node.Name.Reg)
+	case *ast.IfStatement:
+		if err := c.Compile(node.Condition); err != nil {
+			return err
+		}
+
+		falseLabel := c.label.create()
+		doneLabel := c.label.create()
+		condRes := node.Condition.Register()
+
+		c.emit(fmt.Sprintf("beqz %s, %s", condRes, falseLabel))
+
+		// Deallocate the condition register as it is not needed anymore.
+		c.registerTable.dealloc(condRes)
+
+		if err := c.Compile(node.Consequence); err != nil {
+			return err
+		}
+
+		c.emit(fmt.Sprintf("b %s", doneLabel))
+		c.emit(fmt.Sprintf("%s:", falseLabel))
+
+		if node.Alternative != nil {
+			if err := c.Compile(node.Alternative); err != nil {
+				return err
+			}
+		}
+
+		c.emit(fmt.Sprintf("%s:", doneLabel))
 	case *ast.Identifier:
 		s, _ := c.symbolTable.Resolve(node.Value)
 
@@ -186,50 +214,11 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		c.loadGlobalValue(node.Right)
 
-		var operator string
-		switch node.Operator {
-		case "+":
-			operator = "add"
-		case "-":
-			operator = "sub"
-		case "*":
-			operator = "mul"
-		case "/":
-			operator = "div"
-		default:
-			return fmt.Errorf("unknown operator: %s", node.Operator)
+		if err := c.infix(node); err != nil {
+			return err
 		}
 
-		left := node.Left.Register()
-		right := node.Right.Register()
-
-		switch node.T.Kind {
-		case types.Float:
-			// float point operations starts with f and end with .d for double
-			// precision.
-			operator = fmt.Sprintf("f%s.d", operator)
-			c.emit(
-				fmt.Sprintf(
-					"%s %s, %s, %s",
-					operator,
-					left,
-					left,
-					right,
-				),
-			)
-		default:
-			c.emit(
-				fmt.Sprintf(
-					"%s %s, %s, %s",
-					operator,
-					left,
-					left,
-					right,
-				),
-			)
-		}
-
-		c.registerTable.dealloc(right)
+		c.registerTable.dealloc(node.Right.Register())
 		node.Reg = node.Left.Register()
 	case *ast.IntegerLiteral:
 		reg, err := c.registerTable.allocGeneral()
@@ -259,9 +248,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 		// create a label for the floating point
 		// TODO: maybe it would be nice to have different names for labels
 		// after their type.
-		c.label.Create()
 
-		la, err := createASMLabelLiteral(c.label.Name(), node.T, node.Value)
+		floatLabel := c.label.create()
+
+		la, err := createASMLabelLiteral(floatLabel, node.T, node.Value)
 		if err != nil {
 			return err
 		}
@@ -271,7 +261,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 			fmt.Sprintf(
 				"fld %s, %s, %s",
 				node.Reg,
-				c.label.Name(),
+				floatLabel,
 				reg,
 			),
 		)
@@ -285,9 +275,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		node.Reg = reg
-		c.label.Create()
 
-		la, err := createASMLabelLiteral(c.label.Name(), node.T, node.Value)
+		stringLabel := c.label.create()
+		la, err := createASMLabelLiteral(stringLabel, node.T, node.Value)
 		if err != nil {
 			return err
 		}
@@ -295,8 +285,20 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.addConstant(la)
 
 		c.emit(
-			fmt.Sprintf("la %s, %s", node.Reg, c.label.Name()),
+			fmt.Sprintf("la %s, %s", node.Reg, stringLabel),
 		)
+	case *ast.BoolLiteral:
+		reg, err := c.registerTable.allocGeneral()
+		if err != nil {
+			return err
+		}
+
+		node.Reg = reg
+		if node.Value {
+			c.emit(fmt.Sprintf("li %s, 1", reg))
+		} else {
+			c.emit(fmt.Sprintf("li %s, 0", reg))
+		}
 	default:
 		return fmt.Errorf("unknown type: %#v", node)
 	}
@@ -379,6 +381,81 @@ func (c *Compiler) loadGlobalValue(node ast.Expression) {
 	}
 }
 
+func (c *Compiler) infix(inf *ast.InfixExpression) error {
+	left := inf.Left.Register()
+	right := inf.Right.Register()
+	switch inf.Operator {
+	case "+":
+		c.arithmetic("add", left, right, inf.T)
+	case "-":
+		c.arithmetic("sub", left, right, inf.T)
+	case "*":
+		c.arithmetic("mul", left, right, inf.T)
+	case "/":
+		c.arithmetic("div", left, right, inf.T)
+	case "<":
+		c.compare("blt", left, right, inf.T)
+	case "==":
+		c.compare("beq", left, right, inf.T)
+	case "!=":
+		c.compare("bne", left, right, inf.T)
+	default:
+		return fmt.Errorf("unknown operator: %s", inf.Operator)
+	}
+
+	return nil
+}
+
+func (c *Compiler) arithmetic(operator, left, right string, t types.Type) {
+	switch t.Kind {
+	case types.Float:
+		// float point operations starts with f and end with .d for double
+		// precision.
+		operator = fmt.Sprintf("f%s.d", operator)
+		c.emit(
+			fmt.Sprintf(
+				"%s %s, %s, %s",
+				operator,
+				left,
+				left,
+				right,
+			),
+		)
+	default:
+		c.emit(
+			fmt.Sprintf(
+				"%s %s, %s, %s",
+				operator,
+				left,
+				left,
+				right,
+			),
+		)
+	}
+}
+
+func (c *Compiler) compare(operator, left, right string, t types.Type) {
+	trueLabel := c.label.create()
+	doneLabel := c.label.create()
+	switch t.Kind {
+	default:
+		c.emit(
+			fmt.Sprintf(
+				"%s %s, %s, %s",
+				operator,
+				left,
+				right,
+				trueLabel,
+			),
+			fmt.Sprintf("li %s, %d", left, cFalse),
+			fmt.Sprintf("b %s", doneLabel),
+			fmt.Sprintf("%s:", trueLabel),
+			fmt.Sprintf("li %s, %d", left, cTrue),
+			fmt.Sprintf("%s:", doneLabel),
+		)
+	}
+}
+
 // Asm returns the compiled assembly code.
 func (c *Compiler) Asm() string {
 	var sb strings.Builder
@@ -402,7 +479,7 @@ func (c *Compiler) Asm() string {
 // createASMLabelIdentifier creates an asm label for identifiers.
 func createASMLabelIdentifier(name string, t types.Type) (string, error) {
 	switch t.Kind {
-	case types.Int, types.String:
+	case types.Int, types.String, types.Bool:
 		// string identifiers are treated as memory address of the actual
 		// string.
 		return fmt.Sprintf("%s: .dword 0", name), nil
@@ -426,17 +503,5 @@ func createASMLabelLiteral(name string, t types.Type, value interface{}) (string
 		return fmt.Sprintf(`%s: .string "%v"`, name, value), nil
 	default:
 		return "", fmt.Errorf("compiler error: could create label: %s with type: %T", name, t)
-	}
-}
-
-// zeroValue returns the zero value of any type.
-func zeroValue(t types.Type) interface{} {
-	switch t.Kind {
-	case types.Float:
-		return 0.0
-	case types.String:
-		return ""
-	default:
-		return 0
 	}
 }

@@ -76,7 +76,7 @@ func (st *Table) Define(name string, t types.Type) (Symbol, error) {
 		s.Scope = GlobalScope
 	} else {
 		// Do not allow variable shadowing.
-		if s, ok := st.Outer.store[name]; ok {
+		if s, ok := st.Resolve(name); ok {
 			return s, fmt.Errorf("identifier: %q would over shadow existing identfier", name)
 		}
 		s.Scope = LocalScope
@@ -94,7 +94,7 @@ func (st *Table) Resolve(name string) (Symbol, bool) {
 func (st *Table) resolve(name string, stackOffset int) (Symbol, bool) {
 	s, ok := st.store[name]
 	if !ok && st.Outer != nil {
-		s, ok := st.Outer.resolve(name, stackOffset+stackSpace(st.NumDefinitions))
+		s, ok := st.Outer.resolve(name, stackOffset+st.StackSpace())
 		return s, ok
 	}
 
@@ -105,8 +105,8 @@ func (st *Table) resolve(name string, stackOffset int) (Symbol, bool) {
 	return s, ok
 }
 
-func stackSpace(defs int) int {
-	x := math.Round(float64(defs) / 2)
+func (st *Table) StackSpace() int {
+	x := math.Round(float64(st.NumDefinitions) / 2)
 	y := x * 16
 	return int(y)
 }

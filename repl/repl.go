@@ -5,15 +5,20 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/Glorforidor/didactic_compiler/checker"
 	"github.com/Glorforidor/didactic_compiler/compiler"
 	"github.com/Glorforidor/didactic_compiler/lexer"
 	"github.com/Glorforidor/didactic_compiler/parser"
+	"github.com/Glorforidor/didactic_compiler/resolver"
+	"github.com/Glorforidor/didactic_compiler/symbol"
 )
 
 const prompt = ">> "
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+
+	t := symbol.NewTable()
 
 	for {
 		fmt.Fprintf(out, prompt)
@@ -33,8 +38,19 @@ func Start(in io.Reader, out io.Writer) {
 			continue
 		}
 
+		if err := resolver.Resolve(program, t); err != nil {
+			fmt.Fprintf(out, "%s\n", err)
+			continue
+		}
+
+		if err := checker.Check(program); err != nil {
+			fmt.Fprintf(out, "%s\n", err)
+			continue
+		}
+
 		if err := c.Compile(program); err != nil {
-			panic(err)
+			fmt.Fprintf(out, "%s\n", err)
+			continue
 		}
 
 		fmt.Fprintln(out, c.Asm())

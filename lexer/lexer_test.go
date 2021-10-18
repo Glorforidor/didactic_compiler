@@ -18,6 +18,13 @@ func TestNextToken(t *testing.T) {
 	var y int = 2
 	x = 2
 	{}
+	==
+	!=
+	<
+	if 2 < 2 { } else { }
+	true
+	false
+	var x bool
 `
 
 	tests := []struct {
@@ -55,6 +62,23 @@ func TestNextToken(t *testing.T) {
 		{token.Int, "2"},
 		{token.Lbrace, "{"},
 		{token.Rbrace, "}"},
+		{token.Equal, "=="},
+		{token.NotEqual, "!="},
+		{token.LessThan, "<"},
+		{token.If, "if"},
+		{token.Int, "2"},
+		{token.LessThan, "<"},
+		{token.Int, "2"},
+		{token.Lbrace, "{"},
+		{token.Rbrace, "}"},
+		{token.Else, "else"},
+		{token.Lbrace, "{"},
+		{token.Rbrace, "}"},
+		{token.True, "true"},
+		{token.False, "false"},
+		{token.Var, "var"},
+		{token.Ident, "x"},
+		{token.BoolType, "bool"},
 		{token.Eof, ""},
 	}
 

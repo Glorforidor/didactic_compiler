@@ -30,12 +30,22 @@ const (
 	Lbrace TokenType = "{"
 	Rbrace TokenType = "}"
 
+	// Comparison operators
+	Equal    TokenType = "=="
+	NotEqual TokenType = "!="
+	LessThan TokenType = "<"
+
 	// Keywords
 	Print      TokenType = "PRINT"
 	Var        TokenType = "VAR"
-	IntType    TokenType = "IntType"
-	FloatType  TokenType = "FloatType"
-	StringType TokenType = "StringType"
+	If         TokenType = "IF"
+	Else       TokenType = "ELSE"
+	IntType    TokenType = "INT_TYPE"
+	FloatType  TokenType = "FLOAT_TYPE"
+	StringType TokenType = "STRING_TYPE"
+	BoolType   TokenType = "BOOL_TYPE"
+	True       TokenType = "TRUE"
+	False      TokenType = "FALSE"
 )
 
 type Token struct {
@@ -46,9 +56,14 @@ type Token struct {
 var keywords = map[string]TokenType{
 	"print":  Print,
 	"var":    Var,
+	"if":     If,
+	"else":   Else,
 	"int":    IntType,
 	"float":  FloatType,
 	"string": StringType,
+	"bool":   BoolType,
+	"true":   True,
+	"false":  False,
 }
 
 // LookupIdentifier checks if the identifier is a keyword, and if so returns

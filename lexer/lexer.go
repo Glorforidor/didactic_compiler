@@ -37,6 +37,14 @@ func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
 }
 
+func (l *Lexer) makeTwoCharToken(t token.TokenType) token.Token {
+	ch := l.ch
+	l.readChar()
+	literal := string(ch) + string(l.ch)
+
+	return token.Token{Type: t, Literal: literal}
+}
+
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
@@ -50,11 +58,18 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.Asterisk, l.ch)
 	case '/':
 		tok = newToken(token.Slash, l.ch)
+	case '!':
+		if l.peek() == '=' {
+			tok = l.makeTwoCharToken(token.NotEqual)
+		}
 	case '=':
-		tok = newToken(token.Assign, l.ch)
-	case '"':
-		tok.Type = token.String
-		tok.Literal = l.readString()
+		if l.peek() == '=' {
+			tok = l.makeTwoCharToken(token.Equal)
+		} else {
+			tok = newToken(token.Assign, l.ch)
+		}
+	case '<':
+		tok = newToken(token.LessThan, l.ch)
 	case '(':
 		tok = newToken(token.Lparen, l.ch)
 	case ')':
@@ -63,6 +78,9 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.Lbrace, l.ch)
 	case '}':
 		tok = newToken(token.Rbrace, l.ch)
+	case '"':
+		tok.Type = token.String
+		tok.Literal = l.readString()
 	case eof:
 		tok.Type = token.Eof
 		tok.Literal = ""

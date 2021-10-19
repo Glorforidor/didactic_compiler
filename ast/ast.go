@@ -184,6 +184,33 @@ func (ifs *IfStatement) String() string {
 	return out.String()
 }
 
+type ForStatement struct {
+	Token     token.Token // The token.For token.
+	Init      Statement
+	Condition Expression
+	Next      Statement
+	Body      *BlockStatement
+
+	SymbolTable *symbol.Table
+}
+
+func (fs *ForStatement) statementNode()       {}
+func (fs *ForStatement) TokenLiteral() string { return fs.Token.Literal }
+func (fs *ForStatement) String() string {
+	var out strings.Builder
+
+	out.WriteString("for")
+	out.WriteString(" ")
+	out.WriteString(fs.Init.String())
+	out.WriteString("; ")
+	out.WriteString(fs.Condition.String())
+	out.WriteString("; ")
+	out.WriteString(fs.Next.String())
+	out.WriteString(fs.Body.String())
+
+	return out.String()
+}
+
 type Identifier struct {
 	Token token.Token // The token.Ident token.
 	Value string      // e.g. foo, bar, foobar

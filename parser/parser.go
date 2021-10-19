@@ -139,6 +139,8 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseBlockStatement()
 	case token.If:
 		return p.parseIfStatement()
+	case token.For:
+		return p.parseForStatement()
 	default:
 		if p.curToken.Type == token.Ident && p.peekTokenIs(token.Assign) {
 			return p.parseAssignStatement()
@@ -200,7 +202,7 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 }
 
 func (p *Parser) parseAssignStatement() *ast.AssignStatement {
-	stmt := &ast.AssignStatement{}
+	stmt := &ast.AssignStatement{Token: p.curToken}
 	// current token is on the identifier
 	stmt.Name = p.parseExpression(Lowest).(*ast.Identifier)
 
@@ -256,6 +258,52 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 
 		stmt.Alternative = p.parseBlockStatement()
 	}
+
+	return stmt
+}
+
+func (p *Parser) parseForStatement() *ast.ForStatement {
+	stmt := &ast.ForStatement{Token: p.curToken}
+
+	p.nextToken()
+
+	if p.curTokenIs(token.Var) {
+		stmt.Init = p.parseVarStatement()
+	} else if p.curTokenIs(token.Ident) && p.peekTokenIs(token.Assign) {
+		stmt.Init = p.parseAssignStatement()
+	} else {
+		// TODO: maybe allow that the init phase can be omitted.
+		p.errorf("The initialisation in a for statement can either be a var statement or an assign statement.")
+		return nil
+	}
+
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
+	p.nextToken() // advance beyond ;
+
+	stmt.Condition = p.parseExpression(Lowest)
+
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
+	p.nextToken() // advance beyond ;
+
+	if p.curTokenIs(token.Ident) && p.peekTokenIs(token.Assign) {
+		stmt.Next = p.parseAssignStatement()
+	} else {
+		// TODO: maybe allow that the next phase can be omitted.
+		p.errorf("The next in a for statement can only be an assign statement.")
+		return nil
+	}
+
+	if !p.expectPeek(token.Lbrace) {
+		return nil
+	}
+
+	stmt.Body = p.parseBlockStatement()
 
 	return stmt
 }

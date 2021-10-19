@@ -107,24 +107,36 @@ func TestVarStatement(t *testing.T) {
 			t.Fatalf("stmt.TokenLiteral not %q. got=%q", "var", stmt.TokenLiteral())
 		}
 
-		varStmt, ok := stmt.(*ast.VarStatement)
-		if !ok {
-			t.Fatalf("stmt not *ast.VarStatement. got=%T", stmt)
-		}
-
-		if varStmt.Name.Value != tt.expectedIdentifier {
-			t.Fatalf("varStmt.Name.Value not %q, got=%q", tt.expectedIdentifier, varStmt.Name.Value)
-		}
-
-		if varStmt.Name.T.Kind != tt.expectedType.Kind {
-			t.Fatalf("varStmt.Name.T.Kind is not %T, got=%T", tt.expectedType, varStmt.Name.T.Kind)
-		}
-
-		if tt.expectedValue != nil {
-			val := varStmt.Value
-			testLiteralExpression(t, val, tt.expectedValue)
-		}
+		testVarStatement(t, stmt, tt.expectedIdentifier, tt.expectedType, tt.expectedValue)
 	}
+}
+
+func testVarStatement(t *testing.T, stmt ast.Statement, id string, varType types.Type, value interface{}) {
+	t.Helper()
+
+	varStmt, ok := stmt.(*ast.VarStatement)
+	if !ok {
+		t.Fatalf("stmt not *ast.VarStatement. got=%T", stmt)
+	}
+
+	if varStmt.Name.Value != id {
+		t.Fatalf("varStmt.Name.Value not %q, got=%q", id, varStmt.Name.Value)
+	}
+
+	if varStmt.Name.T.Kind != varType.Kind {
+		t.Fatalf("varStmt.Name.T.Kind is not %T, got=%T", varType, varStmt.Name.T.Kind)
+	}
+
+	if value != nil {
+		val := varStmt.Value
+		testLiteralExpression(t, val, value)
+	}
+}
+
+type infix struct {
+	lhs      interface{}
+	operator string
+	rhs      interface{}
 }
 
 func TestAssignStatement(t *testing.T) {
@@ -136,6 +148,7 @@ func TestAssignStatement(t *testing.T) {
 		{"x = 2", "x", 2},
 		{"x = 3.0", "x", 3.0},
 		{`x = "Hello world`, "x", "Hello world"},
+		{"x = 2 + 2", "x", infix{2, "+", 2}},
 	}
 
 	for _, tt := range tests {
@@ -151,19 +164,29 @@ func TestAssignStatement(t *testing.T) {
 			t.Fatalf("stmt.TokenLiteral not %q. got=%q", "=", stmt.TokenLiteral())
 		}
 
-		assignStmt, ok := stmt.(*ast.AssignStatement)
-		if !ok {
-			t.Fatalf("stmt not *ast.AssignStatement, got=%T", stmt)
-		}
+		testAssignStatement(t, stmt, tt.expectedIdentifier, tt.expectedValue)
+	}
+}
 
-		if assignStmt.Name.Value != tt.expectedIdentifier {
-			t.Fatalf(
-				"assignStmt.Name.Value not %q, got=%q",
-				tt.expectedIdentifier, assignStmt.Name.Value,
-			)
-		}
+func testAssignStatement(t *testing.T, stmt ast.Statement, id string, value interface{}) {
+	t.Helper()
 
-		testLiteralExpression(t, assignStmt.Value, tt.expectedValue)
+	assignStmt, ok := stmt.(*ast.AssignStatement)
+	if !ok {
+		t.Fatalf("stmt not *ast.AssignStatement, got=%T", stmt)
+	}
+
+	if assignStmt.Name.Value != id {
+		t.Fatalf(
+			"assignStmt.Name.Value not %q, got=%q",
+			id, assignStmt.Name.Value,
+		)
+	}
+
+	if inf, ok := value.(infix); ok {
+		testInfixExpression(t, assignStmt.Value, inf.lhs, inf.operator, inf.rhs)
+	} else {
+		testLiteralExpression(t, assignStmt.Value, value)
 	}
 }
 
@@ -277,6 +300,33 @@ func TestIfStatementWithElse(t *testing.T) {
 	testIdentifier(t, alternative.Expression, "y")
 }
 
+func TestForStatement(t *testing.T) {
+	input := `for var i int = 0; i < 2; i = i + 1 { print i }`
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserError(t, p)
+	checkProgramLength(t, program)
+
+	forStmt, ok := program.Statements[0].(*ast.ForStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not an *ast.ForStatement. got=%T",
+			program.Statements[0])
+	}
+
+	testVarStatement(t, forStmt.Init, "i", types.Type{Kind: types.Int}, 0)
+
+	testInfixExpression(t, forStmt.Condition, "i", "<", 2)
+
+	testAssignStatement(t, forStmt.Next, "i", infix{"i", "+", 1})
+
+	if len(forStmt.Body.Statements) != 1 {
+		t.Fatalf("forStmt.Body.Statements had the wrong size. expected=%v, got=%v",
+			1, len(forStmt.Body.Statements))
+	}
+}
+
 func TestInfixExpressions(t *testing.T) {
 	tests := []struct {
 		input      string
@@ -289,6 +339,9 @@ func TestInfixExpressions(t *testing.T) {
 		{"5 * 5", 5, "*", 5},
 		{"5 / 5", 5, "/", 5},
 		{"x / 5", "x", "/", 5},
+		{"2 < 2", 2, "<", 2},
+		{"2 == 2", 2, "==", 2},
+		{"2 != 2", 2, "!=", 2},
 	}
 
 	for _, tt := range tests {

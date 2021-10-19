@@ -57,6 +57,23 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 				return err
 			}
 		}
+	case *ast.ForStatement:
+		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
+		if err := Resolve(node.Init, node.SymbolTable); err != nil {
+			return err
+		}
+
+		if err := Resolve(node.Condition, node.SymbolTable); err != nil {
+			return err
+		}
+
+		if err := Resolve(node.Next, node.SymbolTable); err != nil {
+			return err
+		}
+
+		if err := Resolve(node.Body, node.SymbolTable); err != nil {
+			return err
+		}
 	case *ast.Identifier:
 		_, ok := symbolTable.Resolve(node.Value)
 		if !ok {

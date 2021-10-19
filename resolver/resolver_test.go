@@ -108,6 +108,31 @@ x = 2`,
 			}`,
 			expectedToErr: false,
 		},
+		{
+			input: `
+			for var i int = 0; i < 10; i = i + 1 {
+				print i
+			}
+			`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			var i int
+			for i = 0; i < 10; i = i + 1 {
+				print i
+			}
+			`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			for var i int = 0; i < 10; i = i + 1 {
+				print x
+			}
+			`,
+			expectedToErr: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -94,6 +94,30 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				return err
 			}
 		}
+	case *ast.ForStatement:
+		if err := check(node.Init, node.SymbolTable); err != nil {
+			return err
+		}
+
+		if err := check(node.Condition, node.SymbolTable); err != nil {
+			return err
+		}
+
+		if node.Condition.Type().Kind != types.Bool {
+			return fmt.Errorf(
+				"type error: non-bool %s (type %s) used as for condition",
+				node.Condition.String(),
+				node.Condition.Type().Kind,
+			)
+		}
+
+		if err := check(node.Next, node.SymbolTable); err != nil {
+			return err
+		}
+
+		if err := check(node.Body, node.SymbolTable); err != nil {
+			return err
+		}
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
 		if sym.Type.Kind == types.Unknown {

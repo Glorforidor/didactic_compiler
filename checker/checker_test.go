@@ -208,6 +208,35 @@ func TestIfStatement(t *testing.T) {
 	runCheckerTests(t, tests)
 }
 
+func TestForStatement(t *testing.T) {
+	tests := []checkerTest{
+		{
+			input: `
+			for var i int = 0; i < 10; i = i + 1 {
+				print i
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			var i float
+			for i = 0; i < 10; i = i + 1 {
+				print i
+			}`,
+			expectedToErr: true,
+		},
+		{
+			input: `
+			for var i int = 0; i + 10; i = i + 1 {
+				print i
+			}`,
+			expectedToErr: true,
+		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
 func TestComparsion(t *testing.T) {
 	tests := []checkerTest{
 		{

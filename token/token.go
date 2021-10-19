@@ -30,6 +30,9 @@ const (
 	Lbrace TokenType = "{"
 	Rbrace TokenType = "}"
 
+	// Delimiters
+	Semicolon TokenType = ";"
+
 	// Comparison operators
 	Equal    TokenType = "=="
 	NotEqual TokenType = "!="
@@ -38,6 +41,7 @@ const (
 	// Keywords
 	Print      TokenType = "PRINT"
 	Var        TokenType = "VAR"
+	For        TokenType = "FOR"
 	If         TokenType = "IF"
 	Else       TokenType = "ELSE"
 	IntType    TokenType = "INT_TYPE"
@@ -56,6 +60,7 @@ type Token struct {
 var keywords = map[string]TokenType{
 	"print":  Print,
 	"var":    Var,
+	"for":    For,
 	"if":     If,
 	"else":   Else,
 	"int":    IntType,

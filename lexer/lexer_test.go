@@ -25,6 +25,7 @@ func TestNextToken(t *testing.T) {
 	true
 	false
 	var x bool
+	for var i int = 0; i < 1; i = i + 1 { }
 `
 
 	tests := []struct {
@@ -79,6 +80,24 @@ func TestNextToken(t *testing.T) {
 		{token.Var, "var"},
 		{token.Ident, "x"},
 		{token.BoolType, "bool"},
+		{token.For, "for"},
+		{token.Var, "var"},
+		{token.Ident, "i"},
+		{token.IntType, "int"},
+		{token.Assign, "="},
+		{token.Int, "0"},
+		{token.Semicolon, ";"},
+		{token.Ident, "i"},
+		{token.LessThan, "<"},
+		{token.Int, "1"},
+		{token.Semicolon, ";"},
+		{token.Ident, "i"},
+		{token.Assign, "="},
+		{token.Ident, "i"},
+		{token.Plus, "+"},
+		{token.Int, "1"},
+		{token.Lbrace, "{"},
+		{token.Rbrace, "}"},
 		{token.Eof, ""},
 	}
 

@@ -40,6 +40,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 	case *ast.BlockStatement:
 		c.symbolTable = node.SymbolTable // enter scope
+
 		s := node.SymbolTable.StackSpace()
 
 		// Begin of block
@@ -194,6 +195,46 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 		c.emit(fmt.Sprintf("%s:", doneLabel))
+	case *ast.ForStatement:
+		c.symbolTable = node.SymbolTable
+
+		s := node.SymbolTable.StackSpace()
+
+		// Begin of block
+		c.emit(fmt.Sprintf("addi sp, sp, -%d", s))
+
+		if err := c.Compile(node.Init); err != nil {
+			return err
+		}
+
+		topLabel := c.label.create()
+		c.emit(fmt.Sprintf("%s:", topLabel))
+
+		doneLabel := c.label.create()
+
+		if err := c.Compile(node.Condition); err != nil {
+			return err
+		}
+		condRes := node.Condition.Register()
+
+		c.emit(fmt.Sprintf("beqz %s, %s", condRes, doneLabel))
+
+		c.registerTable.dealloc(condRes)
+
+		if err := c.Compile(node.Body); err != nil {
+			return err
+		}
+
+		if err := c.Compile(node.Next); err != nil {
+			return err
+		}
+
+		c.emit(fmt.Sprintf("b %s", topLabel))
+
+		c.emit(fmt.Sprintf("%s:", doneLabel))
+
+		// End of block
+		c.emit(fmt.Sprintf("addi sp, sp, %d", s))
 	case *ast.Identifier:
 		s, _ := c.symbolTable.Resolve(node.Value)
 

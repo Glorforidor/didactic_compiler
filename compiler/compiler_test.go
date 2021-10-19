@@ -430,6 +430,50 @@ func TestIfStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestForStatement(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `
+			for var i int = 0; i < 10; i = i + 1 {
+				print i
+			}`,
+			expected: `
+			.data
+			.text
+			addi sp, sp, -16
+			ld t0, 0(sp)
+			li t1, 0
+			sd t1, 0(sp)
+			.L1:
+			ld t0, 0(sp)
+			li t1, 10
+			blt t0, t1, .L3
+			li t0, 0
+			b .L4
+			.L3:
+			li t0, 1
+			.L4:
+			beqz t0, .L2
+			addi sp, sp, -0
+			ld t0, 0(sp)
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			ld t0, 0(sp)
+			ld t1, 0(sp)
+			li t2, 1
+			add t1, t1, t2
+			sd t1, 0(sp)
+			b .L1
+			.L2:
+			addi sp, sp, 16`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestConditional(t *testing.T) {
 	tests := []compilerTest{
 		{

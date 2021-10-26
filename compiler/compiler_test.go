@@ -25,6 +25,129 @@ type compilerTest struct {
 	input, expected string
 }
 
+func TestArithmetic(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: "2 + 2",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			add t0, t0, t1`,
+		},
+		{
+			input: `2 + 2
+					3 + 3`,
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			add t0, t0, t1
+			li t0, 3
+			li t1, 3
+			add t0, t0, t1`,
+		},
+		{
+			input: "2 - 2",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			sub t0, t0, t1`,
+		},
+		{
+			input: "2 * 2",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			mul t0, t0, t1`,
+		},
+		{
+			input: "2 / 2",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 2
+			div t0, t0, t1`,
+		},
+		{
+			input: "2.1 + 2.1",
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fadd.d ft0, ft0, ft1`,
+		},
+		{
+			input: "2.1 - 2.1",
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fsub.d ft0, ft0, ft1`,
+		},
+		{
+			input: "2.1 * 2.1",
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fmul.d ft0, ft0, ft1`,
+		},
+		{
+			input: "2.1 / 2.1",
+			expected: `
+			.data
+			.L1: .double 2.1
+			.L2: .double 2.1
+			.text
+			fld ft0, .L1, t0
+			fld ft1, .L2, t0
+			fdiv.d ft0, ft0, ft1`,
+		},
+		{
+			input: "2 + 2 - 2",
+			expected: `
+				.data
+				.text
+				li t0, 2
+				li t1, 2
+				add t0, t0, t1
+				li t1, 2
+				sub t0, t0, t1
+			`,
+		},
+		{
+			input: "(5 + 5) / 5",
+			expected: `
+			.data
+			.text
+			li t0, 5
+			li t1, 5
+			add t0, t0, t1
+			li t1, 5
+			div t0, t0, t1`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestPrintStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
@@ -238,9 +361,9 @@ func TestBlockStatement(t *testing.T) {
 			.data
 			.text
 			addi sp, sp, -16
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			li t1, 2
-			sd t1, 0(sp)
+			sd t1, 8(sp)
 			addi sp, sp, 16`,
 		},
 		{
@@ -253,9 +376,9 @@ func TestBlockStatement(t *testing.T) {
 			.L1: .string "Hello Block statement"
 			.text
 			addi sp, sp, -16
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			la t1, .L1
-			sd t1, 0(sp)
+			sd t1, 8(sp)
 			addi sp, sp, 16`,
 		},
 		{
@@ -270,13 +393,34 @@ func TestBlockStatement(t *testing.T) {
 			.L1: .double 32
 			.text
 			addi sp, sp, -16
-			fld ft0, 8(sp)
+			fld ft0, 16(sp)
 			fld ft1, .L1, t0
-			fsd ft1, 8(sp)
-			ld t0, 0(sp)
+			fsd ft1, 16(sp)
+			ld t0, 8(sp)
 			li t1, 2
-			sd t1, 0(sp)
+			sd t1, 8(sp)
 			addi sp, sp, 16`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
+func TestConditional(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: "2 < 3",
+			expected: `
+			.data
+			.text
+			li t0, 2
+			li t1, 3
+			blt t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:`,
 		},
 	}
 
@@ -371,10 +515,10 @@ func TestIfStatement(t *testing.T) {
 			.L2:
 			beqz t0, .L3
 			addi sp, sp, -16
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			li t1, 2
-			sd t1, 0(sp)
-			ld t0, 0(sp)
+			sd t1, 8(sp)
+			ld t0, 8(sp)
 			mv a0, t0
 			li a7, 1
 			ecall
@@ -382,10 +526,10 @@ func TestIfStatement(t *testing.T) {
 			b .L4
 			.L3:
 			addi sp, sp, -16
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			li t1, 3
-			sd t1, 0(sp)
-			ld t0, 0(sp)
+			sd t1, 8(sp)
+			ld t0, 8(sp)
 			mv a0, t0
 			li a7, 1
 			ecall
@@ -441,11 +585,11 @@ func TestForStatement(t *testing.T) {
 			.data
 			.text
 			addi sp, sp, -16
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			li t1, 0
-			sd t1, 0(sp)
+			sd t1, 8(sp)
 			.L1:
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			li t1, 10
 			blt t0, t1, .L3
 			li t0, 0
@@ -455,16 +599,16 @@ func TestForStatement(t *testing.T) {
 			.L4:
 			beqz t0, .L2
 			addi sp, sp, -0
-			ld t0, 0(sp)
+			ld t0, 8(sp)
 			mv a0, t0
 			li a7, 1
 			ecall
 			addi sp, sp, 0
-			ld t0, 0(sp)
-			ld t1, 0(sp)
+			ld t0, 8(sp)
+			ld t1, 8(sp)
 			li t2, 1
 			add t1, t1, t2
-			sd t1, 0(sp)
+			sd t1, 8(sp)
 			b .L1
 			.L2:
 			addi sp, sp, 16`,
@@ -474,144 +618,10 @@ func TestForStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
-func TestConditional(t *testing.T) {
 	tests := []compilerTest{
 		{
-			input: "2 < 3",
 			expected: `
 			.data
-			.text
-			li t0, 2
-			li t1, 3
-			blt t0, t1, .L1
-			li t0, 0
-			b .L2
-			.L1:
-			li t0, 1
-			.L2:`,
-		},
-	}
-
-	runCompilerTests(t, tests)
-}
-
-func TestArithmetic(t *testing.T) {
-	tests := []compilerTest{
-		{
-			input: "2 + 2",
-			expected: `
-			.data
-			.text
-			li t0, 2
-			li t1, 2
-			add t0, t0, t1`,
-		},
-		{
-			input: `2 + 2
-					3 + 3`,
-			expected: `
-			.data
-			.text
-			li t0, 2
-			li t1, 2
-			add t0, t0, t1
-			li t0, 3
-			li t1, 3
-			add t0, t0, t1`,
-		},
-		{
-			input: "2 - 2",
-			expected: `
-			.data
-			.text
-			li t0, 2
-			li t1, 2
-			sub t0, t0, t1`,
-		},
-		{
-			input: "2 * 2",
-			expected: `
-			.data
-			.text
-			li t0, 2
-			li t1, 2
-			mul t0, t0, t1`,
-		},
-		{
-			input: "2 / 2",
-			expected: `
-			.data
-			.text
-			li t0, 2
-			li t1, 2
-			div t0, t0, t1`,
-		},
-		{
-			input: "2.1 + 2.1",
-			expected: `
-			.data
-			.L1: .double 2.1
-			.L2: .double 2.1
-			.text
-			fld ft0, .L1, t0
-			fld ft1, .L2, t0
-			fadd.d ft0, ft0, ft1`,
-		},
-		{
-			input: "2.1 - 2.1",
-			expected: `
-			.data
-			.L1: .double 2.1
-			.L2: .double 2.1
-			.text
-			fld ft0, .L1, t0
-			fld ft1, .L2, t0
-			fsub.d ft0, ft0, ft1`,
-		},
-		{
-			input: "2.1 * 2.1",
-			expected: `
-			.data
-			.L1: .double 2.1
-			.L2: .double 2.1
-			.text
-			fld ft0, .L1, t0
-			fld ft1, .L2, t0
-			fmul.d ft0, ft0, ft1`,
-		},
-		{
-			input: "2.1 / 2.1",
-			expected: `
-			.data
-			.L1: .double 2.1
-			.L2: .double 2.1
-			.text
-			fld ft0, .L1, t0
-			fld ft1, .L2, t0
-			fdiv.d ft0, ft0, ft1`,
-		},
-		{
-			input: "2 + 2 - 2",
-			expected: `
-				.data
-				.text
-				li t0, 2
-				li t1, 2
-				add t0, t0, t1
-				li t1, 2
-				sub t0, t0, t1
-			`,
-		},
-		{
-			input: "(5 + 5) / 5",
-			expected: `
-			.data
-			.text
-			li t0, 5
-			li t1, 5
-			add t0, t0, t1
-			li t1, 5
-			div t0, t0, t1`,
 		},
 	}
 

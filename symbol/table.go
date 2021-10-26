@@ -38,7 +38,7 @@ func (s *Symbol) Code() string {
 		// refers to a label.
 		return s.Name
 	case LocalScope:
-		return fmt.Sprintf("%d(sp)", s.stackOffset+s.which*variableSize)
+		return fmt.Sprintf("%d(sp)", s.stackOffset+(s.which+1)*variableSize)
 	default:
 		panic("Symbol did not have a scope!")
 	}

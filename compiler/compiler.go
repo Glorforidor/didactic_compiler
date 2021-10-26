@@ -69,7 +69,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.loadGlobalValue(node.Value)
 
 		var printType int
-		switch node.Value.Type().Kind {
+		switch node.Value.Type().Kind() {
 		case types.Int:
 			printType = 1
 		case types.Float:
@@ -77,7 +77,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		case types.String:
 			printType = 4
 		default:
-			return fmt.Errorf("compile error: can not print type: %q", node.Value.Type().Kind)
+			return fmt.Errorf("compile error: can not print type: %q", node.Value.Type())
 		}
 
 		reg := node.Value.Register()
@@ -135,6 +135,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 		}
+		// BUG: There is a bug with var statement in blocks, if they are not
+		// initialise with their zero value, the value from the previous
+		// interation is kept, even though it is declared again. I need to
+		// explicit set a zero value if there is non assigned.
 	case *ast.AssignStatement:
 		// TODO: maybe move this to into the global scope check?
 		// Otherwise we will emit an unnecessary load instruction for locals.
@@ -150,14 +154,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 		s, _ := c.symbolTable.Resolve(node.Name.Value)
 
 		if s.Scope == symbol.GlobalScope {
-			switch node.Name.T.Kind {
+			switch s.Type.Kind() {
 			case types.Float:
 				c.emit(fmt.Sprintf("fsd %s, 0(%v)", node.Value.Register(), node.Name.Reg))
 			default:
 				c.emit(fmt.Sprintf("sd %s, 0(%v)", node.Value.Register(), node.Name.Reg))
 			}
 		} else {
-			switch node.Name.T.Kind {
+			switch s.Type.Kind() {
 			case types.Float:
 				c.emit(fmt.Sprintf("fsd %s, %v", node.Value.Register(), s.Code()))
 			default:
@@ -366,7 +370,7 @@ func (c *Compiler) loadSymbol(s symbol.Symbol) (string, error) {
 
 		return reg, nil
 	default:
-		switch s.Type.Kind {
+		switch s.Type.Kind() {
 		case types.Int, types.String:
 			reg, err := c.registerTable.allocGeneral()
 			if err != nil {
@@ -387,7 +391,7 @@ func (c *Compiler) loadSymbol(s symbol.Symbol) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("compile error: can not load symbol: %s of type: %s", s.Name, s.Type.Kind)
+	return "", fmt.Errorf("compile error: can not load symbol: %s of type: %s", s.Name, s.Type)
 }
 
 // loadGlobalValue emits the load instructions iff the given node is of type
@@ -400,7 +404,7 @@ func (c *Compiler) loadGlobalValue(node ast.Expression) {
 
 	s, _ := c.symbolTable.Resolve(id.Value)
 	if s.Scope == symbol.GlobalScope {
-		switch s.Type.Kind {
+		switch s.Type.Kind() {
 		case types.Float:
 			// The identifier will always have normal register allocated to each
 			// since we fetch them by address, so when identifier is a float, we
@@ -448,7 +452,7 @@ func (c *Compiler) infix(inf *ast.InfixExpression) error {
 }
 
 func (c *Compiler) arithmetic(operator, left, right string, t types.Type) {
-	switch t.Kind {
+	switch t.Kind() {
 	case types.Float:
 		// float point operations starts with f and end with .d for double
 		// precision.
@@ -478,7 +482,7 @@ func (c *Compiler) arithmetic(operator, left, right string, t types.Type) {
 func (c *Compiler) compare(operator, left, right string, t types.Type) {
 	trueLabel := c.label.create()
 	doneLabel := c.label.create()
-	switch t.Kind {
+	switch t.Kind() {
 	default:
 		c.emit(
 			fmt.Sprintf(
@@ -519,7 +523,7 @@ func (c *Compiler) Asm() string {
 
 // createASMLabelIdentifier creates an asm label for identifiers.
 func createASMLabelIdentifier(name string, t types.Type) (string, error) {
-	switch t.Kind {
+	switch t.Kind() {
 	case types.Int, types.String, types.Bool:
 		// string identifiers are treated as memory address of the actual
 		// string.
@@ -527,7 +531,7 @@ func createASMLabelIdentifier(name string, t types.Type) (string, error) {
 	case types.Float:
 		return fmt.Sprintf("%s: .double 0", name), nil
 	default:
-		return "", fmt.Errorf("compiler error: could create label: %s with type: %T", name, t)
+		return "", fmt.Errorf("compiler error: could not create label: %s with type: %s", name, t)
 	}
 }
 
@@ -537,12 +541,12 @@ func createASMLabelLiteral(name string, t types.Type, value interface{}) (string
 		return "", fmt.Errorf("compiler error: can not define label with no value")
 	}
 
-	switch t.Kind {
+	switch t.Kind() {
 	case types.Float:
 		return fmt.Sprintf("%s: .double %v", name, value), nil
 	case types.String:
 		return fmt.Sprintf(`%s: .string "%v"`, name, value), nil
 	default:
-		return "", fmt.Errorf("compiler error: could create label: %s with type: %T", name, t)
+		return "", fmt.Errorf("compiler error: could not create label: %s with type: %T", name, t)
 	}
 }

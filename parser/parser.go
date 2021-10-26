@@ -76,8 +76,14 @@ func (p *Parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
 }
 
-func (p *Parser) peekTokenIs(t token.TokenType) bool {
-	return p.peekToken.Type == t
+func (p *Parser) peekTokenIs(ts ...token.TokenType) bool {
+	for _, t := range ts {
+		if p.peekToken.Type == t {
+			return true
+		}
+	}
+
+	return false
 }
 
 // expectPeek advances to next token if the next token is expected.
@@ -180,13 +186,13 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	switch p.curToken.Type {
 	case token.IntType:
-		id.T = types.Type{Kind: types.Int}
+		id.T = types.Typ[types.Int]
 	case token.FloatType:
-		id.T = types.Type{Kind: types.Float}
+		id.T = types.Typ[types.Float]
 	case token.StringType:
-		id.T = types.Type{Kind: types.String}
+		id.T = types.Typ[types.String]
 	case token.BoolType:
-		id.T = types.Type{Kind: types.Bool}
+		id.T = types.Typ[types.Bool]
 	}
 
 	stmt.Name = id

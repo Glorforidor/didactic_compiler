@@ -21,22 +21,22 @@ func TestPrintStatement(t *testing.T) {
 	tests := []checkerTest{
 		{
 			input:         "print 2",
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input:         "print 2 + 2",
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input:         "print 2.0 + 2",
-			expectedType:  types.Type{},
+			expectedType:  nil,
 			expectedToErr: true,
 		},
 		{
 			input:         `print "Hello World" + 2`,
-			expectedType:  types.Type{},
+			expectedType:  nil,
 			expectedToErr: true,
 		},
 	}
@@ -48,27 +48,27 @@ func TestVarStatement(t *testing.T) {
 	tests := []checkerTest{
 		{
 			input:         "var x int",
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input:         "var x int = 1",
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input:         "var x float = 1.0",
-			expectedType:  types.Type{Kind: types.Float},
+			expectedType:  types.Typ[types.Float],
 			expectedToErr: false,
 		},
 		{
 			input:         `var x string = "Hello World"`,
-			expectedType:  types.Type{Kind: types.String},
+			expectedType:  types.Typ[types.String],
 			expectedToErr: false,
 		},
 		{
 			input:         `var x bool = false`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 	}
@@ -81,19 +81,19 @@ func TestAssignStatement(t *testing.T) {
 		{
 			input: `var x int
 x = 2`,
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input: `var x int
 x = 2.5`,
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: true,
 		},
 		{
 			input: `var x bool
 x = "True"`,
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: true,
 		},
 	}
@@ -106,25 +106,25 @@ func TestIdentifier(t *testing.T) {
 		{
 			input: `var x int
 x`,
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input: `var x float
 x`,
-			expectedType:  types.Type{Kind: types.Float},
+			expectedType:  types.Typ[types.Float],
 			expectedToErr: false,
 		},
 		{
 			input: `var x string
 x`,
-			expectedType:  types.Type{Kind: types.String},
+			expectedType:  types.Typ[types.String],
 			expectedToErr: false,
 		},
 		{
 			input: `var x bool
 x`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 	}
@@ -140,21 +140,21 @@ func TestBlockStatement(t *testing.T) {
 			input: `{
 var x int
 }`,
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input: `{
 	var x float
 }`,
-			expectedType:  types.Type{Kind: types.Float},
+			expectedType:  types.Typ[types.Float],
 			expectedToErr: false,
 		},
 		{
 			input: `{
 	var x string
 }`,
-			expectedType:  types.Type{Kind: types.String},
+			expectedType:  types.Typ[types.String],
 			expectedToErr: false,
 		},
 	}
@@ -241,43 +241,123 @@ func TestComparsion(t *testing.T) {
 	tests := []checkerTest{
 		{
 			input:         `2 < 2`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
 			input:         `2 == 2`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
 			input:         `2 != 2`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
 			input:         `2 < false`,
-			expectedType:  types.Type{},
+			expectedType:  nil,
 			expectedToErr: true,
 		},
 		{
 			input:         `2 < 3 == true`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
 			input:         `2 < 3 == true`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
 			input:         `true < true`,
-			expectedType:  types.Type{Kind: types.Bool},
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: true,
 		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
+func TestFuncStatement(t *testing.T) {
+	tests := []struct {
+		input             string
+		expectedFuncType  types.Type
+		expectedParamType types.Type
+		expectedToErr     bool
+	}{
 		{
-			input:         `true < true`,
-			expectedType:  types.Type{Kind: types.Bool},
-			expectedToErr: true,
+			input: `func greeter(x string) {
+				print x
+			}`,
+			expectedFuncType:  &types.Signature{},
+			expectedParamType: types.Typ[types.String],
+			expectedToErr:     false,
+		},
+		{
+			input: `func greeter(x int) {
+				print x + "Hello"
+			}`,
+			expectedFuncType:  &types.Signature{},
+			expectedParamType: types.Typ[types.Int],
+			expectedToErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		resolver.Resolve(program, symbol.NewTable())
+
+		t.Logf("Program: %v", program.String())
+
+		err := Check(program)
+		if err != nil && tt.expectedToErr {
+			continue
+		}
+
+		if err != nil && !tt.expectedToErr {
+			t.Fatalf("checker had errors which was not expected. got=%q", err)
+		}
+
+		if err == nil && tt.expectedToErr {
+			t.Fatalf("checker was assumed to fail, but it did not.")
+		}
+
+		funcStmt, _ := program.Statements[0].(*ast.FuncStatement)
+
+		if funcStmt.Name.T != tt.expectedFuncType {
+			t.Fatalf("funcStmt.Name.T is not %s. got=%s", tt.expectedFuncType, funcStmt.Name.T)
+		}
+
+		if funcStmt.Parameter.T != tt.expectedParamType {
+			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Parameter.T)
+		}
+	}
+}
+
+func TestLiteral(t *testing.T) {
+	tests := []checkerTest{
+		{
+			input:        "2",
+			expectedType: types.Typ[types.Int],
+		},
+		{
+			input:        "2.0",
+			expectedType: types.Typ[types.Float],
+		},
+		{
+			input:        `"Hello Compiler World`,
+			expectedType: types.Typ[types.String],
+		},
+		{
+			input:        "true",
+			expectedType: types.Typ[types.Bool],
+		},
+		{
+			input:        "false",
+			expectedType: types.Typ[types.Bool],
 		},
 	}
 
@@ -288,17 +368,17 @@ func TestArithmetic(t *testing.T) {
 	tests := []checkerTest{
 		{
 			input:         `2 + 2`,
-			expectedType:  types.Type{Kind: types.Int},
+			expectedType:  types.Typ[types.Int],
 			expectedToErr: false,
 		},
 		{
 			input:         `2.0 + 2`,
-			expectedType:  types.Type{},
+			expectedType:  nil,
 			expectedToErr: true,
 		},
 		{
 			input:         `"Hello" + "World"`,
-			expectedType:  types.Type{},
+			expectedType:  nil,
 			expectedToErr: true,
 		},
 	}

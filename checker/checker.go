@@ -51,8 +51,8 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return fmt.Errorf(
 				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name.Value,
-				node.Name.T.Kind,
-				node.Value.Type().Kind,
+				node.Name.T,
+				node.Value.Type(),
 			)
 		}
 	case *ast.AssignStatement:
@@ -68,8 +68,8 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return fmt.Errorf(
 				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name.Value,
-				node.Name.T.Kind,
-				node.Value.Type().Kind,
+				node.Name.T,
+				node.Value.Type(),
 			)
 		}
 	case *ast.IfStatement:
@@ -77,11 +77,11 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 
-		if node.Condition.Type().Kind != types.Bool {
+		if node.Condition.Type() != types.Typ[types.Bool] {
 			return fmt.Errorf(
 				"type error: non-bool %s (type %s) used as if condition",
 				node.Condition.String(),
-				node.Condition.Type().Kind,
+				node.Condition.Type(),
 			)
 		}
 
@@ -103,11 +103,11 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 
-		if node.Condition.Type().Kind != types.Bool {
+		if node.Condition.Type() != types.Typ[types.Bool] {
 			return fmt.Errorf(
 				"type error: non-bool %s (type %s) used as for condition",
 				node.Condition.String(),
-				node.Condition.Type().Kind,
+				node.Condition.Type(),
 			)
 		}
 
@@ -120,8 +120,8 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		}
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
-		if sym.Type.Kind == types.Unknown {
-			return fmt.Errorf("type error: identifier: %s is unknown", node.Value)
+		if sym.Type == types.Typ[types.Unknown] {
+			return fmt.Errorf("type error: identifier: %q has the unknown type", node.Value)
 		}
 
 		node.T = sym.Type
@@ -138,33 +138,35 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		rt := node.Right.Type()
 
 		if lt != rt {
-			return fmt.Errorf("type error: mismatch of types %s and %s", lt.Kind, rt.Kind)
+			return fmt.Errorf("type error: mismatch of types %s and %s", lt, rt)
 		}
 
-		if lt.Kind == types.String {
-			return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt.Kind)
+		if lt == types.Typ[types.String] {
+			return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt)
 		}
 
 		switch node.Operator {
 		case "<":
-			if lt.Kind == types.Bool {
-				return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt.Kind)
+			if lt == types.Typ[types.Bool] {
+				return fmt.Errorf("type error: operator: %v does not support type: %v", node.Operator, lt)
 			}
 
-			node.T = types.Type{Kind: types.Bool}
+			node.T = types.Typ[types.Bool]
 		case "==", "!=":
-			node.T = types.Type{Kind: types.Bool}
+			node.T = types.Typ[types.Bool]
 		default:
 			node.T = lt
 		}
 	case *ast.IntegerLiteral:
-		node.T = types.Type{Kind: types.Int}
+		node.T = types.Typ[types.Int]
 	case *ast.FloatLiteral:
-		node.T = types.Type{Kind: types.Float}
+		node.T = types.Typ[types.Float]
 	case *ast.StringLiteral:
-		node.T = types.Type{Kind: types.String}
+		node.T = types.Typ[types.String]
 	case *ast.BoolLiteral:
-		node.T = types.Type{Kind: types.Bool}
+		node.T = types.Typ[types.Bool]
+	default:
+		return fmt.Errorf("checker: ast node not handled: %T", node)
 	}
 
 	return nil

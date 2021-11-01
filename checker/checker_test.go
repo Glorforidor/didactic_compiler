@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
@@ -101,6 +102,25 @@ x = "True"`,
 	runCheckerTests(t, tests)
 }
 
+func TestTypeStatement(t *testing.T) {
+	tests := []checkerTest{
+		{
+			input: `type human struct{name string}`,
+			expectedType: &types.Struct{
+				Fields: []*types.Field{
+					{
+						Name: "name",
+						Type: types.Typ[types.String],
+					},
+				},
+			},
+			expectedToErr: false,
+		},
+	}
+
+	runCheckerTests(t, tests)
+}
+
 func TestIdentifier(t *testing.T) {
 	tests := []checkerTest{
 		{
@@ -169,6 +189,7 @@ func TestIfStatement(t *testing.T) {
 			if 2 < 2 {
 				print 2
 			}`,
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
@@ -178,6 +199,7 @@ func TestIfStatement(t *testing.T) {
 			} else {
 				print 30
 			}`,
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
@@ -187,6 +209,7 @@ func TestIfStatement(t *testing.T) {
 			} else {
 				print 30
 			}`,
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: false,
 		},
 		{
@@ -194,6 +217,7 @@ func TestIfStatement(t *testing.T) {
 			if 1 {
 				print 20
 			}`,
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: true,
 		},
 		{
@@ -201,6 +225,7 @@ func TestIfStatement(t *testing.T) {
 			if 1 + 1 {
 				print 20
 			}`,
+			expectedType:  types.Typ[types.Bool],
 			expectedToErr: true,
 		},
 	}
@@ -290,14 +315,36 @@ func TestFuncStatement(t *testing.T) {
 			input: `func greeter(x string) {
 				print x
 			}`,
-			expectedFuncType:  &types.Signature{},
+			expectedFuncType: &types.Signature{
+				Parameter: types.Typ[types.String],
+				Result:    nil,
+			},
+			expectedParamType: types.Typ[types.String],
+			expectedToErr:     false,
+		},
+		{
+			input: `func greeter(x string) string {
+				print x
+			}`,
+			expectedFuncType: &types.Signature{
+				Parameter: types.Typ[types.String],
+				Result:    types.Typ[types.String],
+			},
 			expectedParamType: types.Typ[types.String],
 			expectedToErr:     false,
 		},
 		{
 			input: `func greeter(x int) {
-				print x + "Hello"
-			}`,
+		print x + "Hello"
+		}`,
+			expectedFuncType:  &types.Signature{},
+			expectedParamType: types.Typ[types.Int],
+			expectedToErr:     true,
+		},
+		{
+			input: `func greeter(x int) string {
+		print x + "Hello"
+		}`,
 			expectedFuncType:  &types.Signature{},
 			expectedParamType: types.Typ[types.Int],
 			expectedToErr:     true,
@@ -318,7 +365,7 @@ func TestFuncStatement(t *testing.T) {
 		}
 
 		if err != nil && !tt.expectedToErr {
-			t.Fatalf("checker had errors which was not expected. got=%q", err)
+			t.Fatalf("checker had errors which was not expected. got=%s", err)
 		}
 
 		if err == nil && tt.expectedToErr {
@@ -327,8 +374,8 @@ func TestFuncStatement(t *testing.T) {
 
 		funcStmt, _ := program.Statements[0].(*ast.FuncStatement)
 
-		if funcStmt.Name.T != tt.expectedFuncType {
-			t.Fatalf("funcStmt.Name.T is not %s. got=%s", tt.expectedFuncType, funcStmt.Name.T)
+		if funcStmt.Name.T.String() != tt.expectedFuncType.String() {
+			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
 		}
 
 		if funcStmt.Parameter.T != tt.expectedParamType {
@@ -397,12 +444,16 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 		t.Logf("Program: %v", program.String())
 
 		err := Check(program)
-		if err != nil && !tt.expectedToErr {
-			t.Fatalf("checker had errors which was not expected. got=%q", err)
-		} else if err == nil && tt.expectedToErr {
-			t.Fatalf("checker was assumed to fail, but it did not.")
-		} else {
+		if err != nil && tt.expectedToErr {
 			continue
+		}
+
+		if err != nil && !tt.expectedToErr {
+			t.Fatalf("checker had errors which was not expected. got=%s", err)
+		}
+
+		if err == nil && tt.expectedToErr {
+			t.Fatalf("checker was assumed to fail, but it did not.")
 		}
 
 		t.Logf("Typed Program: %v", program.String())
@@ -425,8 +476,8 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 			case *ast.VarStatement:
 				if node.Name.T != tt.expectedType {
 					t.Fatalf(
-						"variable was defined with the wrong type. expected=%s, got=%s",
-						tt.expectedType.Kind, node.Name.T.Kind)
+						"variable: %s was defined with the wrong type. expected=%s, got=%s",
+						node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
 				}
 
 				if node.Value != nil {
@@ -434,18 +485,63 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 						t.Fatalf("allowed to add type: %s to an identifier with type: %s", node.Value.Type(), node.Name.Type())
 					}
 				}
+			case *ast.TypeStatement:
+				n, _ := node.Name.T.(*types.Struct)
+				vv, _ := tt.expectedType.(*types.Struct)
+				for i, f := range n.Fields {
+					if f.Type != vv.Fields[i].Type {
+						t.Fatalf("identifier: %q was defined with the wrong type. expected=%s, got=%s", node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
+					}
+				}
+				// if node.Name.T != tt.expectedType {
+				// 	t.Fatalf("identifier: %q was defined with the wrong type. expected=%s, got=%s", node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
+				// }
 			case *ast.AssignStatement:
 				if node.Name.T != tt.expectedType {
 					t.Fatalf(
 						"variable in assignment have unexpected type. expected=%s, got=%s",
-						tt.expectedType, node.Name.T.Kind)
+						tt.expectedType, node.Name.T)
 				}
 			case *ast.ExpressionStatement:
 				testing(node.Expression)
+			case *ast.FuncStatement:
+				testing(node.Name)
+			case *ast.IfStatement:
+				testing(node.Condition)
+			case *ast.ForStatement:
+				// TODO: Should test that the initialise, condition, and next
+				// all have the correct type.
 			case *ast.Identifier:
 				if node.T != tt.expectedType {
-					t.Fatalf("identified wrong type.")
+					t.Fatalf("identifier has the wrong type. expected=%s, got=%s", tt.expectedType, node.T)
 				}
+			case *ast.InfixExpression:
+				if node.T != tt.expectedType {
+					t.Fatalf("infx expression have unexpected type. expected=%s, got=%s",
+						tt.expectedType, node.T)
+				}
+			case *ast.IntegerLiteral:
+				if node.T != tt.expectedType {
+					t.Fatalf("int literal have unexpected type. expected=%s, got=%s",
+						tt.expectedType, node.T)
+				}
+			case *ast.FloatLiteral:
+				if node.T != tt.expectedType {
+					t.Fatalf("float literal have unexpected type. expected=%s, got=%s",
+						tt.expectedType, node.T)
+				}
+			case *ast.StringLiteral:
+				if node.T != tt.expectedType {
+					t.Fatalf("string literal have unexpected type. expected=%s, got=%s",
+						tt.expectedType, node.T)
+				}
+			case *ast.BoolLiteral:
+				if node.T != tt.expectedType {
+					t.Fatalf("bool literal have unexpected type. expected=%s, got=%s",
+						tt.expectedType, node.T)
+				}
+			default:
+				panic(fmt.Sprintf("unhandled type: %T", node))
 			}
 		}
 

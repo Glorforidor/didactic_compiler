@@ -13,19 +13,21 @@ func TestNextToken(t *testing.T) {
 	print 0.42
 	-/*+
 	(2 + 2)
-	var x int	
+	var x int
 	var x2 int
 	var y int = 2
 	x = 2
 	{}
-	==
-	!=
+	== !=
 	<
 	if 2 < 2 { } else { }
 	true
 	false
 	var x bool
 	for var i int = 0; i < 1; i = i + 1 { }
+	func greet(x int) { }
+	type human struct{name string}
+	return 2
 `
 
 	tests := []struct {
@@ -98,10 +100,27 @@ func TestNextToken(t *testing.T) {
 		{token.Int, "1"},
 		{token.Lbrace, "{"},
 		{token.Rbrace, "}"},
+		{token.Func, "func"},
+		{token.Ident, "greet"},
+		{token.Lparen, "("},
+		{token.Ident, "x"},
+		{token.IntType, "int"},
+		{token.Rparen, ")"},
+		{token.Lbrace, "{"},
+		{token.Rbrace, "}"},
+		{token.Type, "type"},
+		{token.Ident, "human"},
+		{token.Struct, "struct"},
+		{token.Lbrace, "{"},
+		{token.Ident, "name"},
+		{token.StringType, "string"},
+		{token.Rbrace, "}"},
+		{token.Return, "return"},
+		{token.Int, "2"},
 		{token.Eof, ""},
 	}
 
-	l := New(input)
+	l := newTest(input)
 	for i, tt := range tests {
 		tok := l.NextToken()
 

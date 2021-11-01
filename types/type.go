@@ -1,5 +1,9 @@
 package types
 
+import (
+	"strings"
+)
+
 type kind int
 
 const (
@@ -33,12 +37,57 @@ var Typ = []*Basic{
 
 // TODO: fix the kind of signature and struct
 
-type Signature struct{}
+type Signature struct {
+	Parameter Type
+	Result    Type
+}
 
-func (s *Signature) Kind() kind     { return -1 }
-func (s *Signature) String() string { return "" }
+func (s *Signature) Kind() kind { return -1 }
+func (s *Signature) String() string {
+	var sb strings.Builder
+	sb.WriteString(s.Parameter.String())
+	if s.Result != nil {
+		sb.WriteString(" ")
+		sb.WriteString(s.Result.String())
+	}
 
-type Struct struct{}
+	return sb.String()
+}
 
-func (s *Struct) Kind() kind     { return -1 }
-func (s *Struct) String() string { return "" }
+type Field struct {
+	Name string
+	Type Type
+}
+
+func (f *Field) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(f.Name)
+	sb.WriteString(" ")
+	sb.WriteString(f.Type.String())
+
+	return sb.String()
+}
+
+type Struct struct {
+	Fields []*Field
+}
+
+func (s *Struct) Kind() kind { return -1 }
+func (s *Struct) String() string {
+	var sb strings.Builder
+	sb.WriteString("struct")
+	sb.WriteString("{")
+	for i, f := range s.Fields {
+		sb.WriteString(f.String())
+
+		if i == len(s.Fields)-1 {
+			break
+		}
+
+		sb.WriteString(";")
+	}
+	sb.WriteString("}")
+
+	return sb.String()
+}

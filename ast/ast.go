@@ -40,6 +40,12 @@ type Expression interface {
 	expressionNode()
 }
 
+type TypeNode interface {
+	Node
+
+	typeNode()
+}
+
 // Program is the root of the source language for the didactic compiler.
 type Program struct {
 	Statements  []Statement
@@ -139,6 +145,28 @@ func (as *AssignStatement) String() string {
 	return sb.String()
 }
 
+type TypeStatement struct {
+	Token token.Token // The token.Type token.
+	Name  *Identifier
+	Type  TypeNode
+}
+
+func (ts *TypeStatement) statementNode()       {}
+func (ts *TypeStatement) TokenLiteral() string { return ts.Token.Literal }
+func (ts *TypeStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(ts.Token.Literal)
+	sb.WriteString(" ")
+	sb.WriteString(ts.Name.String())
+	sb.WriteString(" ")
+	if ts.Name.T == nil {
+		sb.WriteString(ts.Type.String())
+	}
+
+	return sb.String()
+}
+
 type BlockStatement struct {
 	Token       token.Token // The token.Lcurly token.
 	Statements  []Statement
@@ -169,19 +197,19 @@ type IfStatement struct {
 func (ifs *IfStatement) statementNode()       {}
 func (ifs *IfStatement) TokenLiteral() string { return ifs.Token.Literal }
 func (ifs *IfStatement) String() string {
-	var out strings.Builder
+	var sb strings.Builder
 
-	out.WriteString("if")
-	out.WriteString(ifs.Condition.String())
-	out.WriteString(" ")
-	out.WriteString(ifs.Consequence.String())
+	sb.WriteString("if")
+	sb.WriteString(ifs.Condition.String())
+	sb.WriteString(" ")
+	sb.WriteString(ifs.Consequence.String())
 
 	if ifs.Alternative != nil {
-		out.WriteString("else ")
-		out.WriteString(ifs.Alternative.String())
+		sb.WriteString("else ")
+		sb.WriteString(ifs.Alternative.String())
 	}
 
-	return out.String()
+	return sb.String()
 }
 
 type ForStatement struct {
@@ -197,25 +225,78 @@ type ForStatement struct {
 func (fs *ForStatement) statementNode()       {}
 func (fs *ForStatement) TokenLiteral() string { return fs.Token.Literal }
 func (fs *ForStatement) String() string {
-	var out strings.Builder
+	var sb strings.Builder
 
-	out.WriteString("for")
-	out.WriteString(" ")
-	out.WriteString(fs.Init.String())
-	out.WriteString("; ")
-	out.WriteString(fs.Condition.String())
-	out.WriteString("; ")
-	out.WriteString(fs.Next.String())
-	out.WriteString(fs.Body.String())
+	sb.WriteString("for")
+	sb.WriteString(" ")
+	sb.WriteString(fs.Init.String())
+	sb.WriteString("; ")
+	sb.WriteString(fs.Condition.String())
+	sb.WriteString("; ")
+	sb.WriteString(fs.Next.String())
+	sb.WriteString(fs.Body.String())
 
-	return out.String()
+	return sb.String()
+}
+
+type FuncStatement struct {
+	Token     token.Token // The token.Func token.
+	Name      *Identifier
+	Parameter *Identifier
+	Result    token.Token // Type token: token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident
+	Body      *BlockStatement
+
+	SymbolTable *symbol.Table
+}
+
+func (fs *FuncStatement) statementNode()       {}
+func (fs *FuncStatement) TokenLiteral() string { return fs.Token.Literal }
+func (fs *FuncStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("func")
+	sb.WriteString(" ")
+	sb.WriteString(fs.Name.String())
+	sb.WriteString("(")
+	sb.WriteString(fs.Parameter.String())
+	sb.WriteString(")")
+	sb.WriteString(" ")
+	if fs.Result.Literal != "" {
+		sb.WriteString(fs.Result.Literal)
+		sb.WriteString(" ")
+	}
+	sb.WriteString(fs.Body.String())
+
+	return sb.String()
+}
+
+type ReturnStatement struct {
+	Token token.Token // The token.Return token.
+	Value Expression
+}
+
+func (rs *ReturnStatement) statementNode()       {}
+func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
+func (rs *ReturnStatement) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(rs.Token.Literal)
+	sb.WriteString(" ")
+
+	if rs.Value != nil {
+		sb.WriteString(rs.Value.String())
+	}
+
+	return sb.String()
 }
 
 type Identifier struct {
-	Token token.Token // The token.Ident token.
-	Value string      // e.g. foo, bar, foobar
-	Reg   string
-	T     types.Type
+	Token  token.Token // The token.Ident token.
+	Value  string      // e.g. foo, bar, foobar
+	Ttoken token.Token // Type token: token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident
+
+	Reg string
+	T   types.Type
 }
 
 func (id *Identifier) expressionNode()      {}
@@ -226,9 +307,10 @@ func (id *Identifier) String() string {
 	var sb strings.Builder
 
 	sb.WriteString(id.Value)
-	// sb.WriteString(" ")
-	// sb.WriteString(id.T.Kind.String())
-
+	if id.T != nil {
+		sb.WriteString(" ")
+		sb.WriteString(id.T.String())
+	}
 	return sb.String()
 }
 
@@ -305,6 +387,32 @@ func (ie *InfixExpression) String() string {
 	sb.WriteString(" " + ie.Operator + " ")
 	sb.WriteString(ie.Right.String())
 	sb.WriteString(")")
+
+	return sb.String()
+}
+
+type StructType struct {
+	Token  token.Token // The token.Struct token.
+	Fields []*Identifier
+}
+
+func (st *StructType) typeNode()            {}
+func (st *StructType) TokenLiteral() string { return st.Token.Literal }
+func (st *StructType) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(st.Token.Literal)
+	sb.WriteString("{")
+	for i, field := range st.Fields {
+		sb.WriteString(field.String())
+
+		if i == len(st.Fields)-1 {
+			break
+		}
+
+		sb.WriteString(";")
+	}
+	sb.WriteString("}")
 
 	return sb.String()
 }

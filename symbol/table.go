@@ -3,8 +3,6 @@ package symbol
 import (
 	"fmt"
 	"math"
-
-	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type SymbolScope int
@@ -19,8 +17,8 @@ func (ss SymbolScope) String() string {
 }
 
 type Symbol struct {
-	Name        string      // The identifier.
-	Type        types.Type  // The type of a symbol.
+	Name        string      // The identifier name.
+	Type        interface{} // The token type assoicated to the identifier.
 	Scope       SymbolScope // In which scope is the identifier.
 	stackOffset int         // stackOffset is used for referencing variables from the previous scope
 	which       int         // The ordinal position of variable (local or param)
@@ -64,7 +62,7 @@ func NewEnclosedTable(outer *Table) *Table {
 	return s
 }
 
-func (st *Table) Define(name string, t types.Type) (Symbol, error) {
+func (st *Table) Define(name string, t interface{}) (Symbol, error) {
 	if s, ok := st.store[name]; ok {
 		// TODO: better error message - what scope? maybe just say the variable
 		// is already declared.

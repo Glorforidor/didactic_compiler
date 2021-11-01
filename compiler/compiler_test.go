@@ -618,10 +618,23 @@ func TestForStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestFuncStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
+			input: `func greeter(x string) {
+				print x
+			}`,
 			expected: `
 			.data
+			.text`,
+			// greeter:
+			// sd a0, 8(sp)
+			// ld t0, a0
+			// mv a0, t0
+			// li a7, 4
+			// ecall
+			// ret
+			// `,
 		},
 	}
 

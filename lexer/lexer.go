@@ -3,6 +3,8 @@
 package lexer
 
 import (
+	"fmt"
+
 	"github.com/Glorforidor/didactic_compiler/token"
 )
 
@@ -11,10 +13,22 @@ type Lexer struct {
 	position     int  // current position in input (points to current char)
 	readPosition int  // current reading position in input (after current char)
 	ch           byte // current char under examination
+
+	dontInsertSemi bool // used to skip semicolons in test
+	insertSemi     bool // insert semicolon on new line
 }
+
+// TODO: copy Go's way of inserting semicolons on newline (which is basically
+// just create a token.Semicolon with the literal value of '\n')
 
 func New(input string) *Lexer {
 	l := &Lexer{input: input}
+	l.readChar()
+	return l
+}
+
+func newTest(input string) *Lexer {
+	l := &Lexer{input: input, dontInsertSemi: true}
 	l.readChar()
 	return l
 }
@@ -32,6 +46,7 @@ func (l *Lexer) readChar() {
 }
 
 const eof byte = 0
+const newline byte = '\n'
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
@@ -48,8 +63,14 @@ func (l *Lexer) makeTwoCharToken(t token.TokenType) token.Token {
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
+	var insertSemi bool
+
 	var tok token.Token
 	switch l.ch {
+	case newline:
+		// if we reach here, if l.insertSemi was true
+		l.insertSemi = false
+		tok = newToken(token.Semicolon, l.ch)
 	case '+':
 		tok = newToken(token.Plus, l.ch)
 	case '-':
@@ -74,16 +95,24 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.Lparen, l.ch)
 	case ')':
 		tok = newToken(token.Rparen, l.ch)
+		insertSemi = true
 	case '{':
 		tok = newToken(token.Lbrace, l.ch)
 	case '}':
 		tok = newToken(token.Rbrace, l.ch)
+		insertSemi = true
 	case ';':
 		tok = newToken(token.Semicolon, l.ch)
 	case '"':
 		tok.Type = token.String
 		tok.Literal = l.readString()
+		insertSemi = true
 	case eof:
+		if l.insertSemi {
+			l.insertSemi = false
+			return newToken(token.Semicolon, '\n')
+		}
+
 		tok.Type = token.Eof
 		tok.Literal = ""
 	default:
@@ -91,12 +120,22 @@ func (l *Lexer) NextToken() token.Token {
 			tok.Literal = l.readIdentifier()
 			tok.Type = token.LookupIdentifier(tok.Literal)
 
+			insertSemi = true
+
+			if !l.dontInsertSemi {
+				l.insertSemi = insertSemi
+			}
 			// readIdentifier advances read positions, and therefore we must
 			// return early so we do not advance further.
 			return tok
 		} else if isDigit(l.ch) {
 			tok = l.readNumber()
 
+			insertSemi = true
+
+			if !l.dontInsertSemi {
+				l.insertSemi = insertSemi
+			}
 			// readNumber advances read positions, and therefore we must
 			// return early so we do not advance further.
 			return tok
@@ -105,9 +144,17 @@ func (l *Lexer) NextToken() token.Token {
 		}
 	}
 
+	if !l.dontInsertSemi {
+		l.insertSemi = insertSemi
+	}
+
 	// Advance this pointers so l.ch is updated for the next invocation of
 	// NextToken.
+
 	l.readChar()
+	if tok.Literal == "print" {
+		fmt.Println(l.ch)
+	}
 
 	return tok
 }
@@ -191,7 +238,7 @@ func (l *Lexer) readString() string {
 func (l *Lexer) skipWhiteSpace() {
 	// keep advancing the input positions until hitting a non whitespace
 	// character.
-	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' && !l.insertSemi || l.ch == '\r' {
 		l.readChar()
 	}
 }

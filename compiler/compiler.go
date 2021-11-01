@@ -111,7 +111,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		s, _ := c.symbolTable.Resolve(node.Name.Value)
 
 		if s.Scope == symbol.GlobalScope {
-			la, err := createASMLabelIdentifier(s.Name, s.Type)
+			la, err := createASMLabelIdentifier(s.Name, node.Name.T)
 			if err != nil {
 				return err
 			}
@@ -154,14 +154,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 		s, _ := c.symbolTable.Resolve(node.Name.Value)
 
 		if s.Scope == symbol.GlobalScope {
-			switch s.Type.Kind() {
+			switch node.Name.T.Kind() {
 			case types.Float:
 				c.emit(fmt.Sprintf("fsd %s, 0(%v)", node.Value.Register(), node.Name.Reg))
 			default:
 				c.emit(fmt.Sprintf("sd %s, 0(%v)", node.Value.Register(), node.Name.Reg))
 			}
 		} else {
-			switch s.Type.Kind() {
+			switch node.Name.T.Kind() {
 			case types.Float:
 				c.emit(fmt.Sprintf("fsd %s, %v", node.Value.Register(), s.Code()))
 			default:
@@ -239,10 +239,30 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// End of block
 		c.emit(fmt.Sprintf("addi sp, sp, %d", s))
-	case *ast.Identifier:
-		s, _ := c.symbolTable.Resolve(node.Value)
+	case *ast.FuncStatement:
+		/*
+			DIDAC
+			func greeter(x string) {
+			}
 
-		reg, err := c.loadSymbol(s)
+			---
+			ASM
+			greeter:
+			addi sp, sp, -32 # Decrement the stack to hold the frame
+			sd ra, 8(sp)    # Save the return address
+			sd fp, 16(sp)    # Save the frame pointer
+			addi fp, sp, 32  # Set the frame pointer to the original location of the stack pointer.
+			sd a0, -8(fp)	 # Save the argument into the frame.
+		*/
+		// s, _ := c.symbolTable.Resolve(node.Name.Value)
+
+		// fn, err := createASMLabelIdentifier(s.Name, s.Type)
+		// if err != nil {
+		// return err
+		// }
+		// c.emit(fn)
+	case *ast.Identifier:
+		reg, err := c.loadSymbol(node)
 		if err != nil {
 			return err
 		}
@@ -359,7 +379,9 @@ func (c *Compiler) addConstant(data ...string) {
 	c.constants = append(c.constants, data...)
 }
 
-func (c *Compiler) loadSymbol(s symbol.Symbol) (string, error) {
+func (c *Compiler) loadSymbol(node *ast.Identifier) (string, error) {
+	s, _ := c.symbolTable.Resolve(node.Value)
+
 	switch {
 	case s.Scope == symbol.GlobalScope:
 		reg, err := c.registerTable.allocGeneral()
@@ -370,7 +392,7 @@ func (c *Compiler) loadSymbol(s symbol.Symbol) (string, error) {
 
 		return reg, nil
 	default:
-		switch s.Type.Kind() {
+		switch node.T.Kind() {
 		case types.Int, types.String:
 			reg, err := c.registerTable.allocGeneral()
 			if err != nil {
@@ -404,7 +426,7 @@ func (c *Compiler) loadGlobalValue(node ast.Expression) {
 
 	s, _ := c.symbolTable.Resolve(id.Value)
 	if s.Scope == symbol.GlobalScope {
-		switch s.Type.Kind() {
+		switch node.Type().Kind() {
 		case types.Float:
 			// The identifier will always have normal register allocated to each
 			// since we fetch them by address, so when identifier is a float, we

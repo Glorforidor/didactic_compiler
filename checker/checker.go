@@ -5,6 +5,7 @@ import (
 
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/symbol"
+	"github.com/Glorforidor/didactic_compiler/token"
 	"github.com/Glorforidor/didactic_compiler/types"
 )
 
@@ -54,6 +55,25 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				node.Name.T,
 				node.Value.Type(),
 			)
+		}
+	case *ast.TypeStatement:
+		// type human struct{name string}
+		//
+
+		if err := check(node.Name, symbolTable); err != nil {
+			return err
+		}
+
+		return nil
+	case *ast.StructType:
+		for _, f := range node.Fields {
+			if f.Ttoken.Type == token.Ident {
+				if err := check(f, symbolTable); err != nil {
+					return err
+				}
+			}
+
+			f.T = tokenToType(f.Ttoken)
 		}
 	case *ast.AssignStatement:
 		if err := check(node.Name, symbolTable); err != nil {
@@ -118,13 +138,82 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		if err := check(node.Body, node.SymbolTable); err != nil {
 			return err
 		}
-	case *ast.Identifier:
-		sym, _ := symbolTable.Resolve(node.Value)
-		if sym.Type == types.Typ[types.Unknown] {
-			return fmt.Errorf("type error: identifier: %q has the unknown type", node.Value)
+	case *ast.FuncStatement:
+		if err := check(node.Name, symbolTable); err != nil {
+			return err
 		}
 
-		node.T = sym.Type
+		if err := check(node.Parameter, node.SymbolTable); err != nil {
+			return err
+		}
+
+		var result types.Type
+		if node.Result.Literal != "" {
+			result = tokenToType(node.Result)
+		}
+
+		// TODO: check result type is the same as return statements in body.
+		// This will mean we need to loop over the body to check each statement
+		// for a return statement and check if their type corrospond to the
+		// Result type. Also the last statement in the body has to be a return
+		// statement otherwise there would be unreachable code.
+
+		if err := check(node.Body, node.SymbolTable); err != nil {
+			return err
+		}
+		node.Name.T = &types.Signature{
+			Parameter: node.Parameter.T,
+			Result:    result,
+		}
+	case *ast.Identifier:
+		sym, _ := symbolTable.Resolve(node.Value)
+		switch sym.Type {
+		case token.IntType:
+			node.T = types.Typ[types.Int]
+		case token.FloatType:
+			node.T = types.Typ[types.Float]
+		case token.StringType:
+			node.T = types.Typ[types.String]
+		case token.BoolType:
+			node.T = types.Typ[types.Bool]
+		case token.Ident:
+			s, _ := symbolTable.Resolve(node.Ttoken.Literal)
+			switch s.Type {
+			case token.Func, token.Struct:
+			default:
+				panic(fmt.Sprintf("The underlying type of Ident: %s, is %s", node.Value, s.Type))
+			}
+			// if the identifier has another identifier as type, then that
+			// identifier must be a struct or func type.
+		case token.Struct:
+			// if the identifier is a struct then the identifiers has been gone
+			// through a TypeStatement which means the Identifier should have
+			// the the correct type attached. Therefore, only check that the
+			// node.T is not nil
+			if node.T == nil {
+				return fmt.Errorf("type error: identifier: %q, was not correctly typed as struct", node.Value)
+			}
+		case token.Func:
+			// if the identifier is a func then it should have gone through
+			// FuncStatement.
+		default:
+			if v, ok := sym.Type.(*ast.StructType); ok {
+				if err := check(v, symbolTable); err != nil {
+					return err
+				}
+				var fields []*types.Field
+				for _, f := range v.Fields {
+					fields = append(fields, &types.Field{
+						Name: f.Value,
+						Type: f.T,
+					})
+				}
+
+				node.T = &types.Struct{fields}
+			} else {
+				return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Ttoken)
+			}
+		}
 	case *ast.InfixExpression:
 		if err := check(node.Left, symbolTable); err != nil {
 			return err
@@ -170,4 +259,22 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 	}
 
 	return nil
+}
+
+func tokenToType(t token.Token) types.Type {
+	var typ types.Type
+	switch t.Type {
+	case token.IntType:
+		typ = types.Typ[types.Int]
+	case token.FloatType:
+		typ = types.Typ[types.Float]
+	case token.StringType:
+		typ = types.Typ[types.String]
+	case token.BoolType:
+		typ = types.Typ[types.Bool]
+	default:
+		panic("Handle this at some point")
+	}
+
+	return typ
 }

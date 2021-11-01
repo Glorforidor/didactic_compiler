@@ -37,7 +37,11 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if err := Resolve(node.Value, symbolTable); err != nil {
 			return err
 		}
-		if _, err := symbolTable.Define(node.Name.Value, node.Name.T); err != nil {
+		if _, err := symbolTable.Define(node.Name.Value, node.Name.Ttoken.Type); err != nil {
+			return err
+		}
+	case *ast.TypeStatement:
+		if _, err := symbolTable.Define(node.Name.Value, node.Type); err != nil {
 			return err
 		}
 	case *ast.AssignStatement:
@@ -69,6 +73,20 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 
 		if err := Resolve(node.Next, node.SymbolTable); err != nil {
 			return err
+		}
+
+		if err := Resolve(node.Body, node.SymbolTable); err != nil {
+			return err
+		}
+	case *ast.FuncStatement:
+		if _, err := symbolTable.Define(node.Name.Value, node.Name.Ttoken.Type); err != nil {
+			return err
+		}
+
+		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
+
+		if node.Parameter != nil {
+			node.SymbolTable.Define(node.Parameter.Value, node.Parameter.Ttoken.Type)
 		}
 
 		if err := Resolve(node.Body, node.SymbolTable); err != nil {

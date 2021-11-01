@@ -76,6 +76,24 @@ x = 2`,
 		},
 		{
 			input: `
+			type human struct{name string}
+			`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			type human struct{name string}
+			`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			type human struct{name string}
+			`,
+			expectedToErr: false,
+		},
+		{
+			input: `
 			if 2 < 3 {
 				print 2
 			}`,
@@ -131,6 +149,34 @@ x = 2`,
 				print x
 			}
 			`,
+			expectedToErr: true,
+		},
+		{
+			input: `
+			func test(x int) {
+				print x
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			func test(x int) {
+				print x
+			}
+			func test(x string) {
+				print x
+			}`,
+			expectedToErr: true,
+		},
+		{
+			input: `
+			var test int
+			func test(x int) {
+				print x
+			}
+			func test(x string) {
+				print x
+			}`,
 			expectedToErr: true,
 		},
 	}

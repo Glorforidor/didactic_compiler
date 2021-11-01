@@ -41,9 +41,13 @@ const (
 	// Keywords
 	Print      TokenType = "PRINT"
 	Var        TokenType = "VAR"
+	Type       TokenType = "TYPE"
 	For        TokenType = "FOR"
 	If         TokenType = "IF"
 	Else       TokenType = "ELSE"
+	Func       TokenType = "FUNC"
+	Return     TokenType = "RETURN"
+	Struct     TokenType = "STRUCT"
 	IntType    TokenType = "INT_TYPE"
 	FloatType  TokenType = "FLOAT_TYPE"
 	StringType TokenType = "STRING_TYPE"
@@ -52,6 +56,10 @@ const (
 	False      TokenType = "FALSE"
 )
 
+// NOTE: could add pos and end to token so error messages later could add
+// information about where in the source file the error occured.
+
+// Token represents a lexical token.
 type Token struct {
 	Type    TokenType
 	Literal string
@@ -60,9 +68,13 @@ type Token struct {
 var keywords = map[string]TokenType{
 	"print":  Print,
 	"var":    Var,
+	"type":   Type,
 	"for":    For,
 	"if":     If,
 	"else":   Else,
+	"func":   Func,
+	"return": Return,
+	"struct": Struct,
 	"int":    IntType,
 	"float":  FloatType,
 	"string": StringType,

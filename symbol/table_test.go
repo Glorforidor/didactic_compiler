@@ -3,37 +3,37 @@ package symbol
 import (
 	"testing"
 
-	types "github.com/Glorforidor/didactic_compiler/types"
+	"github.com/Glorforidor/didactic_compiler/token"
 )
 
 func TestDefine(t *testing.T) {
 	expected := map[string]Symbol{
-		"x": Symbol{Name: "x", Scope: GlobalScope, Type: types.Typ[types.Int], which: 0},
-		"y": Symbol{Name: "y", Scope: GlobalScope, Type: types.Typ[types.Int], which: 1},
-		"a": Symbol{Name: "a", Scope: LocalScope, Type: types.Typ[types.Int], which: 0},
-		"b": Symbol{Name: "b", Scope: LocalScope, Type: types.Typ[types.Int], which: 1},
+		"x": Symbol{Name: "x", Scope: GlobalScope, Type: token.IntType, which: 0},
+		"y": Symbol{Name: "y", Scope: GlobalScope, Type: token.IntType, which: 1},
+		"a": Symbol{Name: "a", Scope: LocalScope, Type: token.IntType, which: 0},
+		"b": Symbol{Name: "b", Scope: LocalScope, Type: token.IntType, which: 1},
 	}
 
 	global := NewTable()
 
-	x, _ := global.Define("x", types.Typ[types.Int])
+	x, _ := global.Define("x", token.IntType)
 	if x != expected["x"] {
 		t.Errorf("expected x=%+v, got=%+v", expected["x"], x)
 	}
 
-	y, _ := global.Define("y", types.Typ[types.Int])
+	y, _ := global.Define("y", token.IntType)
 	if y != expected["y"] {
 		t.Errorf("expected y=%+v, got=%+v", expected["y"], y)
 	}
 
 	local := NewEnclosedTable(global)
 
-	a, _ := local.Define("a", types.Typ[types.Int])
+	a, _ := local.Define("a", token.IntType)
 	if a != expected["a"] {
 		t.Errorf("expected a=%+v, got=%+v", expected["a"], a)
 	}
 
-	b, _ := local.Define("b", types.Typ[types.Int])
+	b, _ := local.Define("b", token.IntType)
 	if b != expected["b"] {
 		t.Errorf("expected a=%+v, got=%+v", expected["b"], b)
 	}
@@ -41,12 +41,12 @@ func TestDefine(t *testing.T) {
 
 func TestResolveGlobal(t *testing.T) {
 	global := NewTable()
-	global.Define("x", types.Typ[types.Int])
-	global.Define("y", types.Typ[types.Int])
+	global.Define("x", token.IntType)
+	global.Define("y", token.IntType)
 
 	expected := []Symbol{
-		Symbol{Name: "x", Scope: GlobalScope, Type: types.Typ[types.Int], which: 0},
-		Symbol{Name: "y", Scope: GlobalScope, Type: types.Typ[types.Int], which: 1},
+		Symbol{Name: "x", Scope: GlobalScope, Type: token.IntType, which: 0},
+		Symbol{Name: "y", Scope: GlobalScope, Type: token.IntType, which: 1},
 	}
 
 	for _, sym := range expected {
@@ -65,18 +65,18 @@ func TestResolveGlobal(t *testing.T) {
 
 func TestResolveLocal(t *testing.T) {
 	global := NewTable()
-	global.Define("a", types.Typ[types.Int])
-	global.Define("b", types.Typ[types.Int])
+	global.Define("a", token.IntType)
+	global.Define("b", token.IntType)
 
 	local := NewEnclosedTable(global)
-	local.Define("c", types.Typ[types.Int])
-	local.Define("d", types.Typ[types.Int])
+	local.Define("c", token.IntType)
+	local.Define("d", token.IntType)
 
 	expected := []Symbol{
-		Symbol{Name: "a", Scope: GlobalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 0},
-		Symbol{Name: "b", Scope: GlobalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 1},
-		Symbol{Name: "c", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 0},
-		Symbol{Name: "d", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 1},
+		Symbol{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		Symbol{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		Symbol{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		Symbol{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
 	}
 
 	for _, sym := range expected {
@@ -94,26 +94,26 @@ func TestResolveLocal(t *testing.T) {
 
 func TestResolveMultipleLocal(t *testing.T) {
 	global := NewTable()
-	global.Define("a", types.Typ[types.Int])
-	global.Define("b", types.Typ[types.Int])
+	global.Define("a", token.IntType)
+	global.Define("b", token.IntType)
 
 	local := NewEnclosedTable(global)
-	local.Define("c", types.Typ[types.Int])
-	local.Define("d", types.Typ[types.Int])
+	local.Define("c", token.IntType)
+	local.Define("d", token.IntType)
 
 	secondLocal := NewEnclosedTable(local)
-	secondLocal.Define("e", types.Typ[types.Int])
-	secondLocal.Define("f", types.Typ[types.Int])
-	secondLocal.Define("g", types.Typ[types.Int])
+	secondLocal.Define("e", token.IntType)
+	secondLocal.Define("f", token.IntType)
+	secondLocal.Define("g", token.IntType)
 
 	expected := []Symbol{
-		Symbol{Name: "a", Scope: GlobalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 0},
-		Symbol{Name: "b", Scope: GlobalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 1},
-		Symbol{Name: "c", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 32, which: 0},
-		Symbol{Name: "d", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 32, which: 1},
-		Symbol{Name: "e", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 0},
-		Symbol{Name: "f", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 1},
-		Symbol{Name: "g", Scope: LocalScope, Type: types.Typ[types.Int], stackOffset: 0, which: 2},
+		Symbol{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		Symbol{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		Symbol{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 0},
+		Symbol{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 1},
+		Symbol{Name: "e", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		Symbol{Name: "f", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		Symbol{Name: "g", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 2},
 	}
 
 	for _, sym := range expected {
@@ -135,7 +135,7 @@ func TestCode(t *testing.T) {
 		expected string
 	}{
 		{
-			input:    Symbol{Name: "x", Scope: GlobalScope, Type: types.Typ[types.Int]},
+			input:    Symbol{Name: "x", Scope: GlobalScope, Type: token.IntType},
 			expected: "x",
 		},
 	}

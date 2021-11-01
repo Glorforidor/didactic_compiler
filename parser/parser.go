@@ -9,7 +9,6 @@ import (
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/lexer"
 	"github.com/Glorforidor/didactic_compiler/token"
-	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type (
@@ -96,10 +95,11 @@ func (p *Parser) expectPeek(ts ...token.TokenType) bool {
 	}
 
 	if len(ts) == 1 {
-		p.errorf("expected next token to be %s, got: %s", ts, p.peekToken.Type)
+		p.errorf("expected next token to be %q, got: %q", ts, p.peekToken)
 	} else {
-		p.errorf("expected next token to be one of %v, got: %s", ts, p.peekToken.Type)
+		p.errorf("expected next token to be one of %q, got: %q", ts, p.peekToken)
 	}
+
 	return false
 }
 
@@ -140,16 +140,36 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.Print:
 		return p.parsePrintStatement()
 	case token.Var:
-		return p.parseVarStatement()
+		v := p.parseVarStatement()
+		if !p.expectPeek(token.Semicolon) {
+			return nil
+		}
+
+		return v
+	case token.Type:
+		return p.parseTypeStatement()
 	case token.Lbrace:
-		return p.parseBlockStatement()
+		block := p.parseBlockStatement()
+		if !p.expectPeek(token.Semicolon) {
+			return nil
+		}
+		return block
 	case token.If:
 		return p.parseIfStatement()
 	case token.For:
 		return p.parseForStatement()
+	case token.Func:
+		return p.parseFuncStatement()
+	case token.Return:
+		return p.parseReturnStatement()
 	default:
 		if p.curToken.Type == token.Ident && p.peekTokenIs(token.Assign) {
-			return p.parseAssignStatement()
+			assign := p.parseAssignStatement()
+			if !p.expectPeek(token.Semicolon) {
+				return nil
+			}
+
+			return assign
 		}
 
 		return p.parseExpressionStatement()
@@ -168,6 +188,10 @@ func (p *Parser) parsePrintStatement() *ast.PrintStatement {
 
 	stmt.Value = p.parseExpression(Lowest)
 
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
 	return stmt
 }
 
@@ -180,20 +204,11 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType) {
+	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
 		return nil
 	}
 
-	switch p.curToken.Type {
-	case token.IntType:
-		id.T = types.Typ[types.Int]
-	case token.FloatType:
-		id.T = types.Typ[types.Float]
-	case token.StringType:
-		id.T = types.Typ[types.String]
-	case token.BoolType:
-		id.T = types.Typ[types.Bool]
-	}
+	id.Ttoken = p.curToken
 
 	stmt.Name = id
 
@@ -207,10 +222,90 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 	return stmt
 }
 
+func (p *Parser) parseTypeStatement() *ast.TypeStatement {
+	stmt := &ast.TypeStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.Ident) {
+		return nil
+	}
+
+	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.Struct) {
+		return nil
+	}
+
+	id.Ttoken = p.curToken
+
+	stmt.Name = id
+
+	stmt.Type = p.parseStructType()
+
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseStructType() ast.TypeNode {
+	st := &ast.StructType{
+		Token:  p.curToken,
+		Fields: []*ast.Identifier{},
+	}
+
+	p.nextToken() // advance to '{'
+
+	if p.peekTokenIs(token.Rbrace) {
+		p.nextToken() // advance to '}'
+		return st
+	}
+
+	if !p.expectPeek(token.Ident) {
+		return nil
+	}
+
+	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+		return nil
+	}
+
+	id.Ttoken = p.curToken
+
+	st.Fields = append(st.Fields, id)
+	for p.peekTokenIs(token.Semicolon, token.Ident) {
+		if p.peekTokenIs(token.Semicolon) {
+			p.nextToken() // the semicolon
+
+			if p.peekTokenIs(token.Rbrace) {
+				break
+			}
+		}
+		p.nextToken() // ident
+
+		id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+		if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+			return nil
+		}
+
+		id.Ttoken = p.curToken
+
+		st.Fields = append(st.Fields, id)
+	}
+
+	if !p.expectPeek(token.Rbrace) {
+		return nil
+	}
+
+	return st
+}
+
 func (p *Parser) parseAssignStatement() *ast.AssignStatement {
-	stmt := &ast.AssignStatement{Token: p.curToken}
+	var stmt ast.AssignStatement
 	// current token is on the identifier
-	stmt.Name = p.parseExpression(Lowest).(*ast.Identifier)
+	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	p.nextToken() // advance to the "="
 	stmt.Token = p.curToken
@@ -218,7 +313,7 @@ func (p *Parser) parseAssignStatement() *ast.AssignStatement {
 	p.nextToken() // advance to the value
 	stmt.Value = p.parseExpression(Lowest)
 
-	return stmt
+	return &stmt
 }
 
 func (p *Parser) parseBlockStatement() *ast.BlockStatement {
@@ -237,6 +332,7 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 
 	if p.curTokenIs(token.Eof) {
 		p.errorf("parser error: block statement was never closed")
+		return nil
 	}
 
 	return block
@@ -263,6 +359,10 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 		}
 
 		stmt.Alternative = p.parseBlockStatement()
+	}
+
+	if !p.expectPeek(token.Semicolon) {
+		return nil
 	}
 
 	return stmt
@@ -311,12 +411,100 @@ func (p *Parser) parseForStatement() *ast.ForStatement {
 
 	stmt.Body = p.parseBlockStatement()
 
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseFuncStatement() *ast.FuncStatement {
+	stmt := &ast.FuncStatement{Token: p.curToken}
+
+	if !p.expectPeek(token.Ident) {
+		return nil
+	}
+
+	stmt.Name = &ast.Identifier{
+		Token:  p.curToken,
+		Value:  p.curToken.Literal,
+		Ttoken: stmt.Token,
+	}
+
+	if !p.expectPeek(token.Lparen) {
+		return nil
+	}
+
+	stmt.Parameter = p.parseFuncParameter()
+
+	if !p.expectPeek(token.Rparen) {
+		return nil
+	}
+
+	if p.peekTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+		p.nextToken() // advance to type
+
+		stmt.Result = p.curToken
+	}
+
+	if !p.expectPeek(token.Lbrace) {
+		return nil
+	}
+
+	stmt.Body = p.parseBlockStatement()
+
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
+	return stmt
+}
+
+func (p *Parser) parseFuncParameter() *ast.Identifier {
+	// Early return if there is no parameter.
+	if p.peekTokenIs(token.Rparen) {
+		p.nextToken()
+		return nil
+	}
+
+	p.nextToken() // The identifier.
+
+	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+		return nil
+	}
+
+	id.Ttoken = p.curToken
+
+	return id
+}
+
+func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
+	stmt := &ast.ReturnStatement{Token: p.curToken}
+
+	p.nextToken()
+
+	if p.curTokenIs(token.Semicolon) {
+		return stmt
+	}
+
+	stmt.Value = p.parseExpression(Lowest)
+
+	if !p.expectPeek(token.Semicolon) {
+		return nil
+	}
+
 	return stmt
 }
 
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 	stmt.Expression = p.parseExpression(Lowest)
+
+	if p.peekTokenIs(token.Semicolon) {
+		p.nextToken()
+	}
 
 	return stmt
 }
@@ -334,9 +522,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 
 	leftExp := prefix()
 
-	// TODO: maybe stop when reaching newline as all statements a newline
-	// delimited and not semicolon.
-	for precedence < p.peekPrecedence() {
+	for !p.peekTokenIs(token.Semicolon) && precedence < p.peekPrecedence() {
 		infix := p.infixParseFuncs[p.peekToken.Type]
 		if infix == nil {
 			return leftExp

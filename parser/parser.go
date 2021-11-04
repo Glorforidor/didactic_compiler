@@ -437,10 +437,6 @@ func (p *Parser) parseFuncStatement() *ast.FuncStatement {
 
 	stmt.Parameter = p.parseFuncParameter()
 
-	if !p.expectPeek(token.Rparen) {
-		return nil
-	}
-
 	if p.peekTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
 		p.nextToken() // advance to type
 
@@ -476,6 +472,10 @@ func (p *Parser) parseFuncParameter() *ast.Identifier {
 	}
 
 	id.Ttoken = p.curToken
+
+	if !p.expectPeek(token.Rparen) {
+		return nil
+	}
 
 	return id
 }

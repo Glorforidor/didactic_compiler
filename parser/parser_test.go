@@ -481,53 +481,60 @@ func TestReturnStatement(t *testing.T) {
 
 func TestFuncStatement(t *testing.T) {
 	tests := []struct {
-		input             string
-		expectedName      string
-		expectedParam     string
-		expectedParamType string
-		expectedResult    string
+		input              string
+		expectedName       string
+		expectedParamValue string
+		expectedParamType  string
+		expectedResult     string
 	}{
 		{
-			input:             `func greet(s string) { }`,
-			expectedName:      "greet",
-			expectedParam:     "s",
-			expectedParamType: "string",
-			expectedResult:    "",
+			input:              `func greet() {}`,
+			expectedName:       "greet",
+			expectedParamValue: "",
+			expectedParamType:  "",
+			expectedResult:     "",
 		},
 		{
-			input:             `func greet(s string) int { }`,
-			expectedName:      "greet",
-			expectedParam:     "s",
-			expectedParamType: "string",
-			expectedResult:    "int",
+			input:              `func greet(s string) { }`,
+			expectedName:       "greet",
+			expectedParamValue: "s",
+			expectedParamType:  "string",
+			expectedResult:     "",
 		},
 		{
-			input:             `func greet(s string) float { }`,
-			expectedName:      "greet",
-			expectedParam:     "s",
-			expectedParamType: "string",
-			expectedResult:    "float",
+			input:              `func greet(s string) int { }`,
+			expectedName:       "greet",
+			expectedParamValue: "s",
+			expectedParamType:  "string",
+			expectedResult:     "int",
 		},
 		{
-			input:             `func greet(s string) string { }`,
-			expectedName:      "greet",
-			expectedParam:     "s",
-			expectedParamType: "string",
-			expectedResult:    "string",
+			input:              `func greet(s string) float { }`,
+			expectedName:       "greet",
+			expectedParamValue: "s",
+			expectedParamType:  "string",
+			expectedResult:     "float",
 		},
 		{
-			input:             `func greet(s string) bool { }`,
-			expectedName:      "greet",
-			expectedParam:     "s",
-			expectedParamType: "string",
-			expectedResult:    "bool",
+			input:              `func greet(s string) string { }`,
+			expectedName:       "greet",
+			expectedParamValue: "s",
+			expectedParamType:  "string",
+			expectedResult:     "string",
 		},
 		{
-			input:             `func greet(s string) human { }`,
-			expectedName:      "greet",
-			expectedParam:     "s",
-			expectedParamType: "string",
-			expectedResult:    "human",
+			input:              `func greet(s string) bool { }`,
+			expectedName:       "greet",
+			expectedParamValue: "s",
+			expectedParamType:  "string",
+			expectedResult:     "bool",
+		},
+		{
+			input:              `func greet(s string) human { }`,
+			expectedName:       "greet",
+			expectedParamValue: "s",
+			expectedParamType:  "string",
+			expectedResult:     "human",
 		},
 	}
 
@@ -552,20 +559,22 @@ func TestFuncStatement(t *testing.T) {
 			t.Fatalf("funcStmt.Name is not %q, got=%q", tt.expectedName, funcStmt.Name)
 		}
 
-		if funcStmt.Parameter.Value != tt.expectedParam {
-			t.Fatalf(
-				"funcStmt.Parameter.Value is not %q, got=%q",
-				tt.expectedParam,
-				funcStmt.Parameter.Value,
-			)
-		}
+		if funcStmt.Parameter != nil {
+			if funcStmt.Parameter.Value != tt.expectedParamValue {
+				t.Fatalf(
+					"funcStmt.Parameter.Value is not %q, got=%q",
+					tt.expectedParamValue,
+					funcStmt.Parameter.Value,
+				)
+			}
 
-		if funcStmt.Parameter.Ttoken.Literal != tt.expectedParamType {
-			t.Fatalf(
-				"funcStmt.Parameter.Ttoken.Literal is not %q, got=%q",
-				tt.expectedParamType,
-				funcStmt.Parameter.Ttoken.Literal,
-			)
+			if funcStmt.Parameter.Ttoken.Literal != tt.expectedParamType {
+				t.Fatalf(
+					"funcStmt.Parameter.Ttoken.Literal is not %q, got=%q",
+					tt.expectedParamType,
+					funcStmt.Parameter.Ttoken.Literal,
+				)
+			}
 		}
 
 		if funcStmt.Result.Literal != tt.expectedResult {
@@ -575,6 +584,8 @@ func TestFuncStatement(t *testing.T) {
 				funcStmt.Result.Literal,
 			)
 		}
+
+		t.Logf("%+v", funcStmt)
 	}
 }
 
@@ -776,7 +787,7 @@ func testStringLiteral(t *testing.T, sl ast.Expression, value string) {
 		t.Fatalf("str.Value is not %s. got=%s", value, str.Value)
 	}
 
-	if str.TokenLiteral() != fmt.Sprintf("%s", value) {
+	if str.TokenLiteral() != value {
 		t.Fatalf("str.TokenLiteral is not %s. got=%s", value, str.TokenLiteral())
 	}
 }

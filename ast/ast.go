@@ -258,7 +258,11 @@ func (fs *FuncStatement) String() string {
 	sb.WriteString(" ")
 	sb.WriteString(fs.Name.String())
 	sb.WriteString("(")
-	sb.WriteString(fs.Parameter.String())
+
+	if fs.Parameter != nil {
+		sb.WriteString(fs.Parameter.String())
+	}
+
 	sb.WriteString(")")
 	sb.WriteString(" ")
 	if fs.Result.Literal != "" {

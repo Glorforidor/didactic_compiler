@@ -179,6 +179,13 @@ x = 2`,
 			}`,
 			expectedToErr: true,
 		},
+		{
+			input: `
+			func test(x int) int {
+				return x + 2
+			}`,
+			expectedToErr: false,
+		},
 	}
 
 	for _, tt := range tests {

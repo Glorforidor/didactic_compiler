@@ -92,6 +92,10 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if err := Resolve(node.Body, node.SymbolTable); err != nil {
 			return err
 		}
+	case *ast.ReturnStatement:
+		if err := Resolve(node.Value, symbolTable); err != nil {
+			return err
+		}
 	case *ast.Identifier:
 		_, ok := symbolTable.Resolve(node.Value)
 		if !ok {

@@ -41,7 +41,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.BlockStatement:
 		c.symbolTable = node.SymbolTable // enter scope
 
-		s := node.SymbolTable.StackSpace()
+		s := c.symbolTable.StackSpace()
 
 		// Begin of block
 		c.emit(fmt.Sprintf("addi sp, sp, -%d", s))
@@ -70,7 +70,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		var printType int
 		switch node.Value.Type().Kind() {
-		case types.Int:
+		case types.Int, types.Bool:
 			printType = 1
 		case types.Float:
 			printType = 3
@@ -111,7 +111,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		s, _ := c.symbolTable.Resolve(node.Name.Value)
 
 		if s.Scope == symbol.GlobalScope {
-			la, err := createASMLabelIdentifier(s.Name, node.Name.T)
+			la, err := c.createASMLabelIdentifier(s.Name, node.Name.T)
 			if err != nil {
 				return err
 			}
@@ -202,7 +202,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 	case *ast.ForStatement:
 		c.symbolTable = node.SymbolTable
 
-		s := node.SymbolTable.StackSpace()
+		s := c.symbolTable.StackSpace()
 
 		// Begin of block
 		c.emit(fmt.Sprintf("addi sp, sp, -%d", s))
@@ -239,28 +239,32 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// End of block
 		c.emit(fmt.Sprintf("addi sp, sp, %d", s))
+		c.symbolTable = node.SymbolTable.Outer
+	case *ast.TypeStatement:
+		// type statements is only needed for the semantic analysis.
 	case *ast.FuncStatement:
-		/*
-			DIDAC
-			func greeter(x string) {
-			}
+		c.emit(fmt.Sprintf("%s:", node.Name.Value))
+		// always allocate 16 on the stack since we need to store the return address
+		c.emit("addi sp, sp, -16")
 
-			---
-			ASM
-			greeter:
-			addi sp, sp, -32 # Decrement the stack to hold the frame
-			sd ra, 8(sp)    # Save the return address
-			sd fp, 16(sp)    # Save the frame pointer
-			addi fp, sp, 32  # Set the frame pointer to the original location of the stack pointer.
-			sd a0, -8(fp)	 # Save the argument into the frame.
-		*/
-		// s, _ := c.symbolTable.Resolve(node.Name.Value)
+		if node.Parameter != nil {
+			c.emit("sd a0, 8(sp)")
+		}
 
-		// fn, err := createASMLabelIdentifier(s.Name, s.Type)
-		// if err != nil {
-		// return err
-		// }
-		// c.emit(fn)
+		c.emit(fmt.Sprintf("sd ra, 16(sp)"))
+
+		c.Compile(node.Body)
+
+		c.emit(fmt.Sprintf("ld ra, 16(sp)"))
+		c.emit("addi sp, sp, 16")
+		c.emit("ret")
+	case *ast.ReturnStatement:
+		if err := c.Compile(node.Value); err != nil {
+			return err
+		}
+
+		c.emit(fmt.Sprintf("mv a0, %s", node.Value.Register()))
+		c.registerTable.dealloc(node.Value.Register())
 	case *ast.Identifier:
 		reg, err := c.loadSymbol(node)
 		if err != nil {
@@ -316,7 +320,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		floatLabel := c.label.create()
 
-		la, err := createASMLabelLiteral(floatLabel, node.T, node.Value)
+		la, err := c.createASMLabelLiteral(floatLabel, node.T, node.Value)
 		if err != nil {
 			return err
 		}
@@ -342,7 +346,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 		node.Reg = reg
 
 		stringLabel := c.label.create()
-		la, err := createASMLabelLiteral(stringLabel, node.T, node.Value)
+		la, err := c.createASMLabelLiteral(stringLabel, node.T, node.Value)
 		if err != nil {
 			return err
 		}
@@ -544,7 +548,7 @@ func (c *Compiler) Asm() string {
 }
 
 // createASMLabelIdentifier creates an asm label for identifiers.
-func createASMLabelIdentifier(name string, t types.Type) (string, error) {
+func (c *Compiler) createASMLabelIdentifier(name string, t types.Type) (string, error) {
 	switch t.Kind() {
 	case types.Int, types.String, types.Bool:
 		// string identifiers are treated as memory address of the actual
@@ -552,13 +556,40 @@ func createASMLabelIdentifier(name string, t types.Type) (string, error) {
 		return fmt.Sprintf("%s: .dword 0", name), nil
 	case types.Float:
 		return fmt.Sprintf("%s: .double 0", name), nil
+	case types.StructKind:
+		str, _ := t.(*types.Struct)
+
+		// A string field in a struct is stored as an address to a label with
+		// the string value.
+		var stringLits strings.Builder
+		var structBuilder strings.Builder
+		fmt.Fprintf(&structBuilder, "%s:\n", name)
+		for _, f := range str.Fields {
+			switch f.Type.Kind() {
+			case types.Int, types.Bool:
+				structBuilder.WriteString(".dword 0")
+			case types.Float:
+				structBuilder.WriteString(".double 0.0")
+			case types.String:
+				s := c.label.create()
+				strLabel, err := c.createASMLabelLiteral(s, f.Type, "")
+				if err != nil {
+					return "", err
+				}
+
+				stringLits.WriteString(strLabel)
+				fmt.Fprintf(&structBuilder, ".dword %s", s)
+			}
+		}
+
+		return stringLits.String() + "\n" + structBuilder.String(), nil
 	default:
 		return "", fmt.Errorf("compiler error: could not create label: %s with type: %s", name, t)
 	}
 }
 
 // createASMLabelLiteral creates an asm label for literal values.
-func createASMLabelLiteral(name string, t types.Type, value interface{}) (string, error) {
+func (c *Compiler) createASMLabelLiteral(name string, t types.Type, value interface{}) (string, error) {
 	if value == nil {
 		return "", fmt.Errorf("compiler error: can not define label with no value")
 	}

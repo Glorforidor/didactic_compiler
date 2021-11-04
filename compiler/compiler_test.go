@@ -217,6 +217,26 @@ func TestPrintStatement(t *testing.T) {
 			ecall`,
 		},
 		{
+			input: "print true",
+			expected: `
+			.data
+			.text
+			li t0, 1
+			mv a0, t0
+			li a7, 1
+			ecall`,
+		},
+		{
+			input: "print false",
+			expected: `
+			.data
+			.text
+			li t0, 0
+			mv a0, t0
+			li a7, 1
+			ecall`,
+		},
+		{
 			input: "print 2 + 2",
 			expected: `
 			.data
@@ -274,6 +294,36 @@ func TestVarStatement(t *testing.T) {
 			la t0, x
 			li t1, 2
 			sd t1, 0(t0)`,
+		},
+		{
+			input: `
+			type human struct{name string}
+			var x human
+			`,
+			expected: `
+			.data
+			.L1: .string ""
+			x:
+			.dword .L1
+			.text
+			`,
+		},
+		{
+			input: `
+			type human struct{
+				name string
+				age int
+			}
+			var x human
+			`,
+			expected: `
+			.data
+			.L1: .string ""
+			x:
+			.dword .L1
+			.dword 0
+			.text
+			`,
 		},
 	}
 
@@ -618,23 +668,107 @@ func TestForStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestTypeStatement(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `
+			type human struct{name string}
+			`,
+			expected: `
+			.data
+			.text`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestFuncStatement(t *testing.T) {
 	tests := []compilerTest{
+		{
+			input: `func greeter() {
+				print true
+			}`,
+			expected: `
+			.data
+			.text
+			greeter:
+			addi sp, sp, -16
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			li t0, 1
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+		{
+			input: `func greeter(x int) {
+				print x
+			}`,
+			expected: `
+			.data
+			.text
+			greeter:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
 		{
 			input: `func greeter(x string) {
 				print x
 			}`,
 			expected: `
 			.data
-			.text`,
-			// greeter:
-			// sd a0, 8(sp)
-			// ld t0, a0
-			// mv a0, t0
-			// li a7, 4
-			// ecall
-			// ret
-			// `,
+			.text
+			greeter:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			mv a0, t0
+			li a7, 4
+			ecall
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+		{
+			input: `func greeter(x string) string {
+				return x
+			}`,
+			expected: `
+			.data
+			.text
+			greeter:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			mv a0, t0
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
 		},
 	}
 
@@ -658,7 +792,11 @@ func runCompilerTests(t *testing.T, tests []compilerTest) {
 
 		asm := comp.Asm()
 		if replacer.Replace(asm) != replacer.Replace(tt.expected) {
-			t.Fatalf("wrong assembly emitted.\nexpected=\n%q\ngot=\n%q", replacer.Replace(tt.expected), replacer.Replace(asm))
+			t.Errorf(
+				"wrong assembly emitted.\nexpected=\n%s\ngot=\n%s",
+				strings.Replace(tt.expected, "\t", "", -1),
+				strings.Replace(asm, "\t", "", -1),
+			)
 		}
 	}
 

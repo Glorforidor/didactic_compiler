@@ -24,6 +24,14 @@ type Symbol struct {
 	which       int         // The ordinal position of variable (local or param)
 }
 
+func (s *Symbol) String() string {
+	return fmt.Sprintf("Name: %s, Type: %T", s.Name, s.Type)
+}
+
+func (s *Symbol) UpdateType(t interface{}) {
+	s.Type = t
+}
+
 // variablesSize is the byte size of a variable. As we target RV64 then it is 8
 // bytes.
 const variableSize = 8
@@ -45,14 +53,18 @@ func (s *Symbol) Code() string {
 type Table struct {
 	Outer *Table
 
-	store map[string]Symbol
+	store map[string]*Symbol
 
 	NumDefinitions int
 }
 
+func (st *Table) String() string {
+	return fmt.Sprintf("%+v", st.store)
+}
+
 func NewTable() *Table {
 	return &Table{
-		store: make(map[string]Symbol),
+		store: make(map[string]*Symbol),
 	}
 }
 
@@ -62,14 +74,14 @@ func NewEnclosedTable(outer *Table) *Table {
 	return s
 }
 
-func (st *Table) Define(name string, t interface{}) (Symbol, error) {
+func (st *Table) Define(name string, t interface{}) (*Symbol, error) {
 	if s, ok := st.store[name]; ok {
 		// TODO: better error message - what scope? maybe just say the variable
 		// is already declared.
 		return s, fmt.Errorf("identifier: %q already defined in scope", name)
 	}
 
-	s := Symbol{Name: name, Type: t, which: st.NumDefinitions}
+	s := &Symbol{Name: name, Type: t, which: st.NumDefinitions}
 	if st.Outer == nil {
 		s.Scope = GlobalScope
 	} else {
@@ -85,11 +97,11 @@ func (st *Table) Define(name string, t interface{}) (Symbol, error) {
 	return s, nil
 }
 
-func (st *Table) Resolve(name string) (Symbol, bool) {
+func (st *Table) Resolve(name string) (*Symbol, bool) {
 	return st.resolve(name, 0)
 }
 
-func (st *Table) resolve(name string, stackOffset int) (Symbol, bool) {
+func (st *Table) resolve(name string, stackOffset int) (*Symbol, bool) {
 	s, ok := st.store[name]
 	if !ok && st.Outer != nil {
 		s, ok := st.Outer.resolve(name, stackOffset+st.StackSpace())
@@ -97,7 +109,7 @@ func (st *Table) resolve(name string, stackOffset int) (Symbol, bool) {
 	}
 
 	// No need to add stack offset when it is global.
-	if s.Scope != GlobalScope {
+	if s != nil && s.Scope != GlobalScope {
 		s.stackOffset = stackOffset
 	}
 	return s, ok

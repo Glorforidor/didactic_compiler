@@ -57,23 +57,23 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			)
 		}
 	case *ast.TypeStatement:
-		// type human struct{name string}
-		//
-
 		if err := check(node.Name, symbolTable); err != nil {
 			return err
 		}
 
-		return nil
+		if err := check(node.Type, symbolTable); err != nil {
+			return err
+		}
 	case *ast.StructType:
 		for _, f := range node.Fields {
-			if f.Ttoken.Type == token.Ident {
-				if err := check(f, symbolTable); err != nil {
-					return err
-				}
-			}
+			// In struct only allow for basic types
 
-			f.T = tokenToType(f.Ttoken)
+			// TODO: maybe later allow for struct inside structs.
+			if f.Ttoken.Type == token.Ident {
+				return fmt.Errorf("type error: struct fields can only be a basic type")
+			} else {
+				f.T = tokenToType(f.Ttoken)
+			}
 		}
 	case *ast.AssignStatement:
 		if err := check(node.Name, symbolTable); err != nil {
@@ -139,80 +139,109 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 	case *ast.FuncStatement:
-		if err := check(node.Name, symbolTable); err != nil {
-			return err
-		}
+		var signature types.Signature
 
-		if err := check(node.Parameter, node.SymbolTable); err != nil {
-			return err
+		if node.Parameter != nil {
+			if err := check(node.Parameter, node.SymbolTable); err != nil {
+				return err
+			}
+
+			signature.Parameter = node.Parameter.T
 		}
 
 		var result types.Type
+		// TODO: remember that result can be Ident (struct) or a func type.
 		if node.Result.Literal != "" {
-			result = tokenToType(node.Result)
+			if node.Result.Type == token.Ident {
+				sym, _ := symbolTable.Resolve(node.Result.Literal)
+				result = sym.Type.(*types.Struct)
+			} else {
+				result = tokenToType(node.Result)
+			}
 		}
-
-		// TODO: check result type is the same as return statements in body.
-		// This will mean we need to loop over the body to check each statement
-		// for a return statement and check if their type corrospond to the
-		// Result type. Also the last statement in the body has to be a return
-		// statement otherwise there would be unreachable code.
+		signature.Result = result
 
 		if err := check(node.Body, node.SymbolTable); err != nil {
 			return err
 		}
-		node.Name.T = &types.Signature{
-			Parameter: node.Parameter.T,
-			Result:    result,
+
+		// TODO: Now we only check that the last statement is a return
+		// statement and bail out if it is not. We should probably also loop
+		// over the body and check for multiple return statements (early
+		// returns) and see if they have the correct type.
+		if result != nil {
+			lastIndex := len(node.Body.Statements) - 1
+			n, ok := node.Body.Statements[lastIndex].(*ast.ReturnStatement)
+			if !ok {
+				return fmt.Errorf("type error: function: %s, is missing return statement at the end", node.Name)
+			}
+
+			if n.Value.Type() != result {
+				return fmt.Errorf("type error: function: %s, returns type: %s, but expect to return: %s", node.Name, n.Value.Type(), result)
+			}
+		}
+
+		node.Name.T = &signature
+	case *ast.ReturnStatement:
+		if err := check(node.Value, symbolTable); err != nil {
+			return err
 		}
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
+
 		switch sym.Type {
 		case token.IntType:
 			node.T = types.Typ[types.Int]
+			sym.UpdateType(node.T)
 		case token.FloatType:
 			node.T = types.Typ[types.Float]
+			sym.UpdateType(node.T)
 		case token.StringType:
 			node.T = types.Typ[types.String]
+			sym.UpdateType(node.T)
 		case token.BoolType:
 			node.T = types.Typ[types.Bool]
+			sym.UpdateType(node.T)
 		case token.Ident:
-			s, _ := symbolTable.Resolve(node.Ttoken.Literal)
-			switch s.Type {
-			case token.Func, token.Struct:
-			default:
-				panic(fmt.Sprintf("The underlying type of Ident: %s, is %s", node.Value, s.Type))
-			}
-			// if the identifier has another identifier as type, then that
+			// TODO: check that if an identifier has another identifier as
+			// type, that it is a struct or function.
 			// identifier must be a struct or func type.
-		case token.Struct:
-			// if the identifier is a struct then the identifiers has been gone
-			// through a TypeStatement which means the Identifier should have
-			// the the correct type attached. Therefore, only check that the
-			// node.T is not nil
-			if node.T == nil {
-				return fmt.Errorf("type error: identifier: %q, was not correctly typed as struct", node.Value)
-			}
-		case token.Func:
-			// if the identifier is a func then it should have gone through
-			// FuncStatement.
+			s, _ := symbolTable.Resolve(node.Ttoken.Literal)
+			node.T = s.Type.(*types.Struct)
+			sym.UpdateType(node.T)
 		default:
-			if v, ok := sym.Type.(*ast.StructType); ok {
-				if err := check(v, symbolTable); err != nil {
-					return err
-				}
-				var fields []*types.Field
-				for _, f := range v.Fields {
-					fields = append(fields, &types.Field{
-						Name: f.Value,
-						Type: f.T,
-					})
-				}
-
-				node.T = &types.Struct{fields}
-			} else {
-				return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Ttoken)
+			if _, ok := sym.Type.(ast.TypeNode); ok {
+				// let the other switch construct the proper type.
+				break
 			}
+
+			// assert that the end type is a proper type.
+			if _, ok := sym.Type.(types.Type); !ok {
+				panic("the symbol should have been updated with the proper type")
+			}
+		}
+
+		switch v := sym.Type.(type) {
+		case *ast.StructType:
+			if err := check(v, symbolTable); err != nil {
+				return err
+			}
+			var fields []*types.Field
+			for _, f := range v.Fields {
+				fields = append(fields, &types.Field{
+					Name: f.Value,
+					Type: f.T,
+				})
+			}
+
+			node.T = &types.Struct{Fields: fields}
+			sym.UpdateType(node.T)
+		case *types.Struct:
+			node.T = v
+		case *types.Basic:
+			node.T = v
+		default:
+			return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Ttoken)
 		}
 	case *ast.InfixExpression:
 		if err := check(node.Left, symbolTable); err != nil {
@@ -273,7 +302,7 @@ func tokenToType(t token.Token) types.Type {
 	case token.BoolType:
 		typ = types.Typ[types.Bool]
 	default:
-		panic("Handle this at some point")
+		panic(fmt.Sprintf("tokenToType can not handle this token type: %s", t))
 	}
 
 	return typ

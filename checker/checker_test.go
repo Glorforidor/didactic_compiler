@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
@@ -70,6 +71,21 @@ func TestVarStatement(t *testing.T) {
 		{
 			input:         `var x bool = false`,
 			expectedType:  types.Typ[types.Bool],
+			expectedToErr: false,
+		},
+		{
+			input: `
+			type human struct{name string}
+			var x human
+			`,
+			expectedType: &types.Struct{
+				Fields: []*types.Field{
+					{
+						Name: "name",
+						Type: types.Typ[types.String],
+					},
+				},
+			},
 			expectedToErr: false,
 		},
 	}
@@ -312,6 +328,10 @@ func TestFuncStatement(t *testing.T) {
 		expectedToErr     bool
 	}{
 		{
+			input:            `func none() {}`,
+			expectedFuncType: &types.Signature{},
+		},
+		{
 			input: `func greeter(x string) {
 				print x
 			}`,
@@ -326,6 +346,15 @@ func TestFuncStatement(t *testing.T) {
 			input: `func greeter(x string) string {
 				print x
 			}`,
+			expectedFuncType:  &types.Signature{},
+			expectedParamType: types.Typ[types.String],
+			expectedToErr:     true,
+		},
+		{
+			input: `func greeter(x string) string {
+				print x
+				return x
+			}`,
 			expectedFuncType: &types.Signature{
 				Parameter: types.Typ[types.String],
 				Result:    types.Typ[types.String],
@@ -334,17 +363,19 @@ func TestFuncStatement(t *testing.T) {
 			expectedToErr:     false,
 		},
 		{
-			input: `func greeter(x int) {
-		print x + "Hello"
-		}`,
+			input: `
+			func greeter(x int) {
+				print x + "Hello"
+			}`,
 			expectedFuncType:  &types.Signature{},
 			expectedParamType: types.Typ[types.Int],
 			expectedToErr:     true,
 		},
 		{
-			input: `func greeter(x int) string {
-		print x + "Hello"
-		}`,
+			input: `
+			func greeter(x int) string {
+				print x + "Hello"
+			}`,
 			expectedFuncType:  &types.Signature{},
 			expectedParamType: types.Typ[types.Int],
 			expectedToErr:     true,
@@ -355,14 +386,18 @@ func TestFuncStatement(t *testing.T) {
 		l := lexer.New(tt.input)
 		p := parser.New(l)
 		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Logf("%v", p.Errors())
+		}
 		resolver.Resolve(program, symbol.NewTable())
 
 		t.Logf("Program: %v", program.String())
-
 		err := Check(program)
 		if err != nil && tt.expectedToErr {
 			continue
 		}
+
+		t.Logf("Program after been checked: %v", program.String())
 
 		if err != nil && !tt.expectedToErr {
 			t.Fatalf("checker had errors which was not expected. got=%s", err)
@@ -374,11 +409,94 @@ func TestFuncStatement(t *testing.T) {
 
 		funcStmt, _ := program.Statements[0].(*ast.FuncStatement)
 
-		if funcStmt.Name.T.String() != tt.expectedFuncType.String() {
+		if !reflect.DeepEqual(funcStmt.Name.T, tt.expectedFuncType) {
 			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
 		}
 
-		if funcStmt.Parameter.T != tt.expectedParamType {
+		if funcStmt.Parameter != nil && !reflect.DeepEqual(funcStmt.Parameter.T, tt.expectedParamType) {
+			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Parameter.T)
+		}
+	}
+}
+
+func TestFuncStatementWithStruct(t *testing.T) {
+	tests := []struct {
+		input             string
+		expectedFuncType  types.Type
+		expectedParamType types.Type
+		expectedToErr     bool
+	}{
+		{
+			input: `
+					type human struct{name string}
+
+					func greeter(x human) human {
+						print x
+						return x
+					}`,
+			expectedFuncType: &types.Signature{
+				Parameter: &types.Struct{
+					Fields: []*types.Field{
+						{
+							Name: "name",
+							Type: types.Typ[types.String],
+						},
+					},
+				},
+				Result: &types.Struct{
+					Fields: []*types.Field{
+						{
+							Name: "name",
+							Type: types.Typ[types.String],
+						},
+					},
+				},
+			},
+			expectedParamType: &types.Struct{
+				Fields: []*types.Field{
+					{
+						Name: "name",
+						Type: types.Typ[types.String],
+					},
+				},
+			},
+			expectedToErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Logf("%v", p.Errors())
+		}
+		resolver.Resolve(program, symbol.NewTable())
+
+		t.Logf("Program: %v", program.String())
+
+		err := Check(program)
+		if err != nil && tt.expectedToErr {
+			continue
+		}
+
+		t.Logf("Program after been checked: %v", program.String())
+
+		if err != nil && !tt.expectedToErr {
+			t.Fatalf("checker had errors which was not expected. got=%s", err)
+		}
+
+		if err == nil && tt.expectedToErr {
+			t.Fatalf("checker was assumed to fail, but it did not.")
+		}
+
+		funcStmt, _ := program.Statements[1].(*ast.FuncStatement)
+
+		if !reflect.DeepEqual(funcStmt.Name.T, tt.expectedFuncType) {
+			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
+		}
+
+		if !reflect.DeepEqual(funcStmt.Parameter.T, tt.expectedParamType) {
 			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Parameter.T)
 		}
 	}
@@ -474,7 +592,14 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 					t.Fatalf("added wrong type: expected=%s, got=%s", tt.expectedType, node.Value.Type())
 				}
 			case *ast.VarStatement:
-				if node.Name.T != tt.expectedType {
+				if v, ok := node.Name.T.(*types.Struct); ok {
+					vv, _ := tt.expectedType.(*types.Struct)
+					for i, f := range v.Fields {
+						if f.Type != vv.Fields[i].Type {
+							t.Fatalf("identifier: %q was defined with the wrong type. expected=%s, got=%s", node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
+						}
+					}
+				} else if node.Name.T != tt.expectedType {
 					t.Fatalf(
 						"variable: %s was defined with the wrong type. expected=%s, got=%s",
 						node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
@@ -493,9 +618,6 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 						t.Fatalf("identifier: %q was defined with the wrong type. expected=%s, got=%s", node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
 					}
 				}
-				// if node.Name.T != tt.expectedType {
-				// 	t.Fatalf("identifier: %q was defined with the wrong type. expected=%s, got=%s", node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
-				// }
 			case *ast.AssignStatement:
 				if node.Name.T != tt.expectedType {
 					t.Fatalf(
@@ -511,6 +633,9 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 			case *ast.ForStatement:
 				// TODO: Should test that the initialise, condition, and next
 				// all have the correct type.
+				if node.Condition.Type() != types.Typ[types.Bool] {
+					t.Fatalf("condition in for statement does not evalutate to a bool")
+				}
 			case *ast.Identifier:
 				if node.T != tt.expectedType {
 					t.Fatalf("identifier has the wrong type. expected=%s, got=%s", tt.expectedType, node.T)
@@ -541,7 +666,7 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 						tt.expectedType, node.T)
 				}
 			default:
-				panic(fmt.Sprintf("unhandled type: %T", node))
+				t.Fatalf(fmt.Sprintf("unhandled type: %T", node))
 			}
 		}
 

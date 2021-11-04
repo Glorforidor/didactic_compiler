@@ -12,6 +12,8 @@ const (
 	Float
 	String
 	Bool
+	StructKind
+	Func
 )
 
 type Type interface {
@@ -42,10 +44,13 @@ type Signature struct {
 	Result    Type
 }
 
-func (s *Signature) Kind() kind { return -1 }
+func (s *Signature) Kind() kind { return Func }
 func (s *Signature) String() string {
 	var sb strings.Builder
-	sb.WriteString(s.Parameter.String())
+
+	if s.Parameter != nil {
+		sb.WriteString(s.Parameter.String())
+	}
 	if s.Result != nil {
 		sb.WriteString(" ")
 		sb.WriteString(s.Result.String())
@@ -73,7 +78,7 @@ type Struct struct {
 	Fields []*Field
 }
 
-func (s *Struct) Kind() kind { return -1 }
+func (s *Struct) Kind() kind { return StructKind }
 func (s *Struct) String() string {
 	var sb strings.Builder
 	sb.WriteString("struct")

@@ -7,34 +7,34 @@ import (
 )
 
 func TestDefine(t *testing.T) {
-	expected := map[string]Symbol{
-		"x": Symbol{Name: "x", Scope: GlobalScope, Type: token.IntType, which: 0},
-		"y": Symbol{Name: "y", Scope: GlobalScope, Type: token.IntType, which: 1},
-		"a": Symbol{Name: "a", Scope: LocalScope, Type: token.IntType, which: 0},
-		"b": Symbol{Name: "b", Scope: LocalScope, Type: token.IntType, which: 1},
+	expected := map[string]*Symbol{
+		"x": {Name: "x", Scope: GlobalScope, Type: token.IntType, which: 0},
+		"y": {Name: "y", Scope: GlobalScope, Type: token.IntType, which: 1},
+		"a": {Name: "a", Scope: LocalScope, Type: token.IntType, which: 0},
+		"b": {Name: "b", Scope: LocalScope, Type: token.IntType, which: 1},
 	}
 
 	global := NewTable()
 
 	x, _ := global.Define("x", token.IntType)
-	if x != expected["x"] {
+	if *x != *expected["x"] {
 		t.Errorf("expected x=%+v, got=%+v", expected["x"], x)
 	}
 
 	y, _ := global.Define("y", token.IntType)
-	if y != expected["y"] {
+	if *y != *expected["y"] {
 		t.Errorf("expected y=%+v, got=%+v", expected["y"], y)
 	}
 
 	local := NewEnclosedTable(global)
 
 	a, _ := local.Define("a", token.IntType)
-	if a != expected["a"] {
+	if *a != *expected["a"] {
 		t.Errorf("expected a=%+v, got=%+v", expected["a"], a)
 	}
 
 	b, _ := local.Define("b", token.IntType)
-	if b != expected["b"] {
+	if *b != *expected["b"] {
 		t.Errorf("expected a=%+v, got=%+v", expected["b"], b)
 	}
 }
@@ -44,9 +44,9 @@ func TestResolveGlobal(t *testing.T) {
 	global.Define("x", token.IntType)
 	global.Define("y", token.IntType)
 
-	expected := []Symbol{
-		Symbol{Name: "x", Scope: GlobalScope, Type: token.IntType, which: 0},
-		Symbol{Name: "y", Scope: GlobalScope, Type: token.IntType, which: 1},
+	expected := []*Symbol{
+		{Name: "x", Scope: GlobalScope, Type: token.IntType, which: 0},
+		{Name: "y", Scope: GlobalScope, Type: token.IntType, which: 1},
 	}
 
 	for _, sym := range expected {
@@ -56,7 +56,7 @@ func TestResolveGlobal(t *testing.T) {
 				t.Fatalf("name %s not resolvable", sym.Name)
 			}
 
-			if result != sym {
+			if *result != *sym {
 				t.Fatalf("expected %s to resolve to %+v, got=%+v", sym.Name, sym, result)
 			}
 		})
@@ -72,11 +72,11 @@ func TestResolveLocal(t *testing.T) {
 	local.Define("c", token.IntType)
 	local.Define("d", token.IntType)
 
-	expected := []Symbol{
-		Symbol{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		Symbol{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
-		Symbol{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		Symbol{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
+	expected := []*Symbol{
+		{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
 	}
 
 	for _, sym := range expected {
@@ -86,7 +86,7 @@ func TestResolveLocal(t *testing.T) {
 			continue
 		}
 
-		if result != sym {
+		if *result != *sym {
 			t.Errorf("expected %s to resolve to %+v, got=%+v", sym.Name, sym, result)
 		}
 	}
@@ -106,14 +106,14 @@ func TestResolveMultipleLocal(t *testing.T) {
 	secondLocal.Define("f", token.IntType)
 	secondLocal.Define("g", token.IntType)
 
-	expected := []Symbol{
-		Symbol{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		Symbol{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
-		Symbol{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 0},
-		Symbol{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 1},
-		Symbol{Name: "e", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		Symbol{Name: "f", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
-		Symbol{Name: "g", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 2},
+	expected := []*Symbol{
+		{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 0},
+		{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 1},
+		{Name: "e", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
+		{Name: "f", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		{Name: "g", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 2},
 	}
 
 	for _, sym := range expected {
@@ -123,7 +123,7 @@ func TestResolveMultipleLocal(t *testing.T) {
 			continue
 		}
 
-		if result != sym {
+		if *result != *sym {
 			t.Errorf("expected %s to resolve to %+v, got=%+v", sym.Name, sym, result)
 		}
 	}

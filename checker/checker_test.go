@@ -137,6 +137,54 @@ func TestTypeStatement(t *testing.T) {
 	runCheckerTests(t, tests)
 }
 
+func TestSelectorExpression(t *testing.T) {
+	tests := []struct {
+		input                string
+		expectedSelectorType types.Type
+		expectedToErr        bool
+	}{
+		{
+			input: `
+			type human struct{name string}
+			var x human
+			x.name`,
+			expectedSelectorType: types.Typ[types.String],
+			expectedToErr:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Logf("%v", p.Errors())
+		}
+		resolver.Resolve(program, symbol.NewTable())
+
+		t.Logf("Program: %v", program.String())
+		err := Check(program)
+		if err != nil && !tt.expectedToErr {
+			t.Fatalf("%s", err)
+		}
+		t.Logf("Typed Program: %v", program.String())
+
+		exprStmt, ok := program.Statements[2].(*ast.ExpressionStatement)
+		if !ok {
+			t.Fatalf("program.Statements[2] was not an *ast.ExpressionStatement. got=%T", program.Statements[2])
+		}
+
+		sel, ok := exprStmt.Expression.(*ast.SelectorExpression)
+		if !ok {
+			t.Fatalf("exprStmt.Expression was not an *ast.Selector. got=%T", exprStmt.Expression)
+		}
+
+		if sel.T != tt.expectedSelectorType {
+			t.Fatalf("sel.T was not %T. got=%T", tt.expectedSelectorType, sel.T)
+		}
+	}
+}
+
 func TestIdentifier(t *testing.T) {
 	tests := []checkerTest{
 		{
@@ -328,8 +376,11 @@ func TestFuncStatement(t *testing.T) {
 		expectedToErr     bool
 	}{
 		{
-			input:            `func none() {}`,
-			expectedFuncType: &types.Signature{},
+			input: `func none() {}`,
+			expectedFuncType: &types.Signature{
+				Parameter: types.Typ[types.Nil],
+				Result:    types.Typ[types.Nil],
+			},
 		},
 		{
 			input: `func greeter(x string) {
@@ -337,7 +388,7 @@ func TestFuncStatement(t *testing.T) {
 			}`,
 			expectedFuncType: &types.Signature{
 				Parameter: types.Typ[types.String],
-				Result:    nil,
+				Result:    types.Typ[types.Nil],
 			},
 			expectedParamType: types.Typ[types.String],
 			expectedToErr:     false,
@@ -346,7 +397,10 @@ func TestFuncStatement(t *testing.T) {
 			input: `func greeter(x string) string {
 				print x
 			}`,
-			expectedFuncType:  &types.Signature{},
+			expectedFuncType: &types.Signature{
+				Parameter: types.Typ[types.Nil],
+				Result:    types.Typ[types.Nil],
+			},
 			expectedParamType: types.Typ[types.String],
 			expectedToErr:     true,
 		},
@@ -413,10 +467,75 @@ func TestFuncStatement(t *testing.T) {
 			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
 		}
 
-		if funcStmt.Parameter != nil && !reflect.DeepEqual(funcStmt.Parameter.T, tt.expectedParamType) {
-			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Parameter.T)
+		if funcStmt.Signature.Parameter != nil && !reflect.DeepEqual(funcStmt.Signature.Parameter.T, tt.expectedParamType) {
+			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Signature.Parameter.T)
 		}
 	}
+}
+
+func TestFunctionPrototypes(t *testing.T) {
+	tests := []struct {
+		input             string
+		expectedFuncType  types.Type
+		expectedParamType types.Type
+		expectedToErr     bool
+	}{
+		{
+			input: `
+			func greeter(x string)
+
+			greeter("hejsa")
+
+			func greeter(x string) {
+				print x
+			}`,
+			expectedFuncType: &types.Signature{
+				Parameter: types.Typ[types.String],
+				Result:    types.Typ[types.Nil],
+			},
+			expectedParamType: types.Typ[types.String],
+			expectedToErr:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Fatalf("%v", p.Errors())
+		}
+		if err := resolver.Resolve(program, symbol.NewTable()); err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		t.Logf("Program: %v", program.String())
+		err := Check(program)
+		if err != nil && tt.expectedToErr {
+			continue
+		}
+
+		t.Logf("Program after been checked: %v", program.String())
+
+		if err != nil && !tt.expectedToErr {
+			t.Fatalf("checker had errors which was not expected. got=%s", err)
+		}
+
+		if err == nil && tt.expectedToErr {
+			t.Fatalf("checker was assumed to fail, but it did not.")
+		}
+
+		funcStmt, _ := program.Statements[0].(*ast.FuncStatement)
+
+		if !reflect.DeepEqual(funcStmt.Name.T, tt.expectedFuncType) {
+			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
+		}
+
+		if funcStmt.Signature.Parameter != nil && !reflect.DeepEqual(funcStmt.Signature.Parameter.T, tt.expectedParamType) {
+			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Signature.Parameter.T)
+		}
+	}
+
 }
 
 func TestFuncStatementWithStruct(t *testing.T) {
@@ -496,8 +615,67 @@ func TestFuncStatementWithStruct(t *testing.T) {
 			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
 		}
 
-		if !reflect.DeepEqual(funcStmt.Parameter.T, tt.expectedParamType) {
-			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Parameter.T)
+		if !reflect.DeepEqual(funcStmt.Signature.Parameter.T, tt.expectedParamType) {
+			t.Fatalf("funcStmt.Parameter.T is not %s. got=%s", tt.expectedParamType, funcStmt.Signature.Parameter.T)
+		}
+	}
+}
+
+func TestCallExpression(t *testing.T) {
+	tests := []struct {
+		input            string
+		expectedCallType types.Type
+	}{
+		{
+			input: `func compile(x string) {
+				print x
+			}
+
+			compile("Hello")`,
+			expectedCallType: types.Typ[types.Nil],
+		},
+		{
+			input: `func compile(x string) string{
+				return x
+			}
+
+			compile("Hello")`,
+			expectedCallType: types.Typ[types.String],
+		},
+		{
+			input: `func compile(x string) string{
+				return x
+			}
+
+			compile("Hello Compiler World")`,
+			expectedCallType: types.Typ[types.String],
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := parser.New(l)
+		program := p.ParseProgram()
+		if len(p.Errors()) != 0 {
+			t.Logf("%v", p.Errors())
+		}
+		resolver.Resolve(program, symbol.NewTable())
+
+		t.Logf("Program: %v", program.String())
+		t.Logf("Program length: %v", len(program.Statements))
+
+		err := Check(program)
+		if err != nil {
+			t.Fatalf("%v", err)
+		}
+
+		t.Logf("Program after been checked: %v", program.String())
+
+		exprStmt, _ := program.Statements[1].(*ast.ExpressionStatement)
+		call, _ := exprStmt.Expression.(*ast.CallExpression)
+
+		if call.T != tt.expectedCallType {
+			t.Fatalf("Call expression was evalutated to the wrong type, expected=%v, got=%s", tt.expectedCallType, call.T)
 		}
 	}
 }
@@ -619,11 +797,7 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 					}
 				}
 			case *ast.AssignStatement:
-				if node.Name.T != tt.expectedType {
-					t.Fatalf(
-						"variable in assignment have unexpected type. expected=%s, got=%s",
-						tt.expectedType, node.Name.T)
-				}
+				testing(node.Name)
 			case *ast.ExpressionStatement:
 				testing(node.Expression)
 			case *ast.FuncStatement:

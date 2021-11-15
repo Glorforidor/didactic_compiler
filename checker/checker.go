@@ -2,6 +2,7 @@ package checker
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/Glorforidor/didactic_compiler/ast"
 	"github.com/Glorforidor/didactic_compiler/symbol"
@@ -75,6 +76,33 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				f.T = tokenToType(f.Ttoken)
 			}
 		}
+	case *ast.SelectorExpression:
+		if err := check(node.X, symbolTable); err != nil {
+			return err
+		}
+
+		switch v := node.X.(type) {
+		case *ast.Identifier:
+			x, ok := v.T.(*types.Struct)
+			if !ok {
+				return fmt.Errorf(
+					"type error: selecting field on identifier: %s, which is not a struct",
+					v,
+				)
+			}
+			if !identifierInStruct(node.Field, x) {
+				return fmt.Errorf(
+					"type error: identifier: %s is not a field in struct: %s",
+					node.Field.Value,
+					v.Value,
+				)
+			}
+
+		default:
+			return fmt.Errorf("type error: select X is not an Identifier")
+		}
+
+		node.T = node.Field.T
 	case *ast.AssignStatement:
 		if err := check(node.Name, symbolTable); err != nil {
 			return err
@@ -84,11 +112,11 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 
-		if node.Name.T != node.Value.Type() {
+		if node.Name.Type() != node.Value.Type() {
 			return fmt.Errorf(
 				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
-				node.Name.Value,
-				node.Name.T,
+				node.Name,
+				node.Name.Type(),
 				node.Value.Type(),
 			)
 		}
@@ -141,74 +169,126 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 	case *ast.FuncStatement:
 		var signature types.Signature
 
-		if node.Parameter != nil {
-			if err := check(node.Parameter, node.SymbolTable); err != nil {
+		var parameter types.Type
+		if node.Signature.Parameter != nil {
+			if err := check(node.Signature.Parameter, node.SymbolTable); err != nil {
 				return err
 			}
 
-			signature.Parameter = node.Parameter.T
+			parameter = node.Signature.Parameter.T
+		} else {
+			parameter = types.Typ[types.Nil]
 		}
+		signature.Parameter = parameter
 
 		var result types.Type
 		// TODO: remember that result can be Ident (struct) or a func type.
-		if node.Result.Literal != "" {
-			if node.Result.Type == token.Ident {
-				sym, _ := symbolTable.Resolve(node.Result.Literal)
+		if node.Signature.Result.Literal != "" {
+			if node.Signature.Result.Type == token.Ident {
+				sym, _ := symbolTable.Resolve(node.Signature.Result.Literal)
 				result = sym.Type.(*types.Struct)
 			} else {
-				result = tokenToType(node.Result)
+				result = tokenToType(node.Signature.Result)
 			}
+		} else {
+			result = types.Typ[types.Nil]
 		}
 		signature.Result = result
 
-		if err := check(node.Body, node.SymbolTable); err != nil {
-			return err
-		}
-
-		// TODO: Now we only check that the last statement is a return
-		// statement and bail out if it is not. We should probably also loop
-		// over the body and check for multiple return statements (early
-		// returns) and see if they have the correct type.
-		if result != nil {
-			lastIndex := len(node.Body.Statements) - 1
-			n, ok := node.Body.Statements[lastIndex].(*ast.ReturnStatement)
-			if !ok {
-				return fmt.Errorf("type error: function: %s, is missing return statement at the end", node.Name)
+		if node.Body != nil {
+			// special case that a prototype have been defined
+			sym, _ := symbolTable.Resolve(node.Name.Value)
+			if v, ok := sym.Type.(*types.Signature); ok {
+				if !reflect.DeepEqual(signature, *v) {
+					return fmt.Errorf("type error: function: %q's prototype and definition differ in signature", node.Name.Value)
+				}
 			}
 
-			if n.Value.Type() != result {
-				return fmt.Errorf("type error: function: %s, returns type: %s, but expect to return: %s", node.Name, n.Value.Type(), result)
+			if err := check(node.Body, node.SymbolTable); err != nil {
+				return err
+			}
+
+			// TODO: Now we only check that the last statement is a return
+			// statement and bail out if it is not. We should probably also loop
+			// over the body and check for multiple return statements (early
+			// returns) and see if they have the correct type.
+			if result.Kind() != types.Nil {
+				lastIndex := len(node.Body.Statements) - 1
+				n, ok := node.Body.Statements[lastIndex].(*ast.ReturnStatement)
+				if !ok {
+					return fmt.Errorf("type error: function: %s, is missing return statement at the end", node.Name)
+				}
+
+				if n.Value.Type() != result {
+					return fmt.Errorf("type error: function: %s, returns type: %s, but expect to return: %s", node.Name, n.Value.Type(), result)
+				}
 			}
 		}
 
 		node.Name.T = &signature
+		sym, _ := symbolTable.Resolve(node.Name.Value)
+		sym.Type = node.Name.T
 	case *ast.ReturnStatement:
 		if err := check(node.Value, symbolTable); err != nil {
 			return err
 		}
+	case *ast.CallExpression:
+		if err := check(node.Function, symbolTable); err != nil {
+			return err
+		}
+
+		if node.Argument != nil {
+			if err := check(node.Argument, symbolTable); err != nil {
+				return err
+			}
+		}
+
+		sig, ok := node.Function.Type().(*types.Signature)
+		if !ok {
+			return fmt.Errorf(
+				"type error: identifier: %q is not a function",
+				node.Function.TokenLiteral(),
+			)
+		}
+
+		if node.Argument == nil {
+			if sig.Parameter.Kind() != types.Nil {
+				// TODO: Better error message here will be great.
+				return fmt.Errorf("type error: function takes arguements, non was provided")
+			}
+		} else if !reflect.DeepEqual(sig.Parameter, node.Argument.Type()) {
+			return fmt.Errorf(
+				"type error: wrong argument type for %q, expected: %s, got: %s",
+				node.Function.TokenLiteral(),
+				sig.Parameter,
+				node.Argument.Type(),
+			)
+		}
+
+		node.T = sig.Result
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
 
 		switch sym.Type {
 		case token.IntType:
 			node.T = types.Typ[types.Int]
-			sym.UpdateType(node.T)
+			sym.Type = node.T
 		case token.FloatType:
 			node.T = types.Typ[types.Float]
-			sym.UpdateType(node.T)
+			sym.Type = node.T
 		case token.StringType:
 			node.T = types.Typ[types.String]
-			sym.UpdateType(node.T)
+			sym.Type = node.T
 		case token.BoolType:
 			node.T = types.Typ[types.Bool]
-			sym.UpdateType(node.T)
+			sym.Type = node.T
 		case token.Ident:
 			// TODO: check that if an identifier has another identifier as
 			// type, that it is a struct or function.
 			// identifier must be a struct or func type.
 			s, _ := symbolTable.Resolve(node.Ttoken.Literal)
 			node.T = s.Type.(*types.Struct)
-			sym.UpdateType(node.T)
+			sym.Type = node.T
 		default:
 			if _, ok := sym.Type.(ast.TypeNode); ok {
 				// let the other switch construct the proper type.
@@ -217,7 +297,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 
 			// assert that the end type is a proper type.
 			if _, ok := sym.Type.(types.Type); !ok {
-				panic("the symbol should have been updated with the proper type")
+				panic(fmt.Sprintf("the symbol: %s should have been updated with the proper type. %v", sym.Name, sym.Type))
 			}
 		}
 
@@ -235,10 +315,12 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			}
 
 			node.T = &types.Struct{Fields: fields}
-			sym.UpdateType(node.T)
+			sym.Type = node.T
 		case *types.Struct:
 			node.T = v
 		case *types.Basic:
+			node.T = v
+		case *types.Signature:
 			node.T = v
 		default:
 			return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Ttoken)
@@ -284,10 +366,24 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 	case *ast.BoolLiteral:
 		node.T = types.Typ[types.Bool]
 	default:
-		return fmt.Errorf("checker: ast node not handled: %T", node)
+		return fmt.Errorf("type error: ast node not handled: %T", node)
 	}
 
 	return nil
+}
+
+// identifierInStruct checks if the identifier is in the struct. If it is, then
+// updates that identifier with the same type as the one in the struct and
+// returns true. Otherwise returns false.
+func identifierInStruct(id *ast.Identifier, s *types.Struct) bool {
+	for _, f := range s.Fields {
+		if f.Name == id.Value {
+			id.T = f.Type
+			return true
+		}
+	}
+
+	return false
 }
 
 func tokenToType(t token.Token) types.Type {

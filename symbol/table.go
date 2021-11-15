@@ -2,7 +2,9 @@ package symbol
 
 import (
 	"fmt"
-	"math"
+	"sort"
+
+	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type SymbolScope int
@@ -22,31 +24,28 @@ type Symbol struct {
 	Name        string      // The identifier name.
 	Type        interface{} // The token type assoicated to the identifier.
 	Scope       SymbolScope // In which scope is the identifier.
-	stackOffset int         // stackOffset is used for referencing variables from the previous scope
 	which       int         // The ordinal position of variable (local or param)
+	stackPoint  int         // Where the symbol resides on the stack.
+	stackOffset int         // stackOffset is used for referencing variables from the previous scope
 }
 
 func (s *Symbol) String() string {
 	return fmt.Sprintf("Name: %s, Type: %T", s.Name, s.Type)
 }
 
-func (s *Symbol) UpdateType(t interface{}) {
-	s.Type = t
-}
-
 // variablesSize is the byte size of a variable. As we target RV64 then it is 8
 // bytes.
 const variableSize = 8
 
-// Code returns the assembly code for the symbol.
-func (s *Symbol) Code() string {
+func (s *Symbol) Code() interface{} {
+	// Code returns the assembly code for the symbol.
 	switch s.Scope {
 	case GlobalScope:
 		// In the global scope it is always just the name of the symbol as it
 		// refers to a label.
 		return s.Name
 	case LocalScope:
-		return fmt.Sprintf("%d(sp)", s.stackOffset+(s.which+1)*variableSize)
+		return s.stackOffset + s.stackPoint
 	default:
 		panic("Symbol did not have a scope!")
 	}
@@ -57,7 +56,9 @@ type Table struct {
 
 	store map[string]*Symbol
 
-	NumDefinitions int
+	numDefinitions int
+
+	stackSpace int
 }
 
 func (st *Table) String() string {
@@ -109,7 +110,7 @@ func (st *Table) Define(name string, t interface{}) (*Symbol, error) {
 		return s, fmt.Errorf("identifier: %q already defined in scope", name)
 	}
 
-	s := &Symbol{Name: name, Type: t, which: st.NumDefinitions}
+	s := &Symbol{Name: name, Type: t, which: st.numDefinitions}
 	if st.Outer == nil {
 		s.Scope = GlobalScope
 	} else {
@@ -120,9 +121,62 @@ func (st *Table) Define(name string, t interface{}) (*Symbol, error) {
 		s.Scope = LocalScope
 	}
 	st.store[name] = s
-	st.NumDefinitions++
+	st.numDefinitions++
 
 	return s, nil
+}
+
+// size calculates the size needed on the stack to accomendate the type. The
+// Basic types always allocate 8 as we target the RV64. If it is a struct type
+// the size is all the fields combined.
+func size(t interface{}) int {
+	switch v := t.(type) {
+	case *types.Basic:
+		return 8
+	case *types.Struct:
+		var space int
+		for _, f := range v.Fields {
+			space += size(f.Type)
+		}
+
+		return space
+	}
+
+	return 0
+}
+
+// ComputeStack how much stack space each block will accomendate and also sets
+// the symbols stack offset.
+func (st *Table) ComputeStack() {
+	keys := make([]string, 0, len(st.store))
+	for k := range st.store {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		return st.store[keys[i]].which < st.store[keys[j]].which
+	})
+
+	// The first element on the stack is always at 8(sp). Writing to 0(sp)
+	// should always be safe and should never overwrite other data.
+	x := 8
+
+	for _, k := range keys {
+		v := st.store[k]
+		if v.Scope == TypeScope {
+			continue
+		}
+
+		v.stackPoint = x
+		x += size(v.Type)
+	}
+
+	// The stack space always need to be 16 byte alligned. We subtract 8 from x
+	// since we add that extra 8 as offset.
+	if (x-8)%16 == 0 {
+		st.stackSpace = x - 8
+	} else {
+		st.stackSpace = x
+	}
 }
 
 func (st *Table) Resolve(name string) (*Symbol, bool) {
@@ -144,7 +198,8 @@ func (st *Table) resolve(name string, stackOffset int) (*Symbol, bool) {
 }
 
 func (st *Table) StackSpace() int {
-	x := math.Round(float64(st.NumDefinitions) / 2)
-	y := x * 16
-	return int(y)
+	// x := math.Round(float64(st.numDefinitions) / 2)
+	// y := x * 16
+	// return int(y)
+	return st.stackSpace
 }

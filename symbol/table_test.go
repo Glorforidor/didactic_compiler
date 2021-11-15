@@ -73,10 +73,10 @@ func TestResolveLocal(t *testing.T) {
 	local.Define("d", token.IntType)
 
 	expected := []*Symbol{
-		{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
-		{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
+		{Name: "a", Scope: GlobalScope, Type: token.IntType, which: 0},
+		{Name: "b", Scope: GlobalScope, Type: token.IntType, which: 1},
+		{Name: "c", Scope: LocalScope, Type: token.IntType, which: 0},
+		{Name: "d", Scope: LocalScope, Type: token.IntType, which: 1},
 	}
 
 	for _, sym := range expected {
@@ -107,13 +107,13 @@ func TestResolveMultipleLocal(t *testing.T) {
 	secondLocal.Define("g", token.IntType)
 
 	expected := []*Symbol{
-		{Name: "a", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		{Name: "b", Scope: GlobalScope, Type: token.IntType, stackOffset: 0, which: 1},
-		{Name: "c", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 0},
-		{Name: "d", Scope: LocalScope, Type: token.IntType, stackOffset: 32, which: 1},
-		{Name: "e", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 0},
-		{Name: "f", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 1},
-		{Name: "g", Scope: LocalScope, Type: token.IntType, stackOffset: 0, which: 2},
+		{Name: "a", Scope: GlobalScope, Type: token.IntType, which: 0},
+		{Name: "b", Scope: GlobalScope, Type: token.IntType, which: 1},
+		{Name: "c", Scope: LocalScope, Type: token.IntType, which: 0},
+		{Name: "d", Scope: LocalScope, Type: token.IntType, which: 1},
+		{Name: "e", Scope: LocalScope, Type: token.IntType, which: 0},
+		{Name: "f", Scope: LocalScope, Type: token.IntType, which: 1},
+		{Name: "g", Scope: LocalScope, Type: token.IntType, which: 2},
 	}
 
 	for _, sym := range expected {
@@ -132,18 +132,22 @@ func TestResolveMultipleLocal(t *testing.T) {
 func TestCode(t *testing.T) {
 	tests := []struct {
 		input    Symbol
-		expected string
+		expected interface{}
 	}{
 		{
 			input:    Symbol{Name: "x", Scope: GlobalScope, Type: token.IntType},
 			expected: "x",
+		},
+		{
+			input:    Symbol{Name: "x", Scope: LocalScope, Type: token.IntType, stackPoint: 8},
+			expected: 8,
 		},
 	}
 
 	for _, tt := range tests {
 		got := tt.input.Code()
 		if tt.expected != got {
-			t.Fatalf("symbol had wrong code. expected=%q, got=%q", tt.expected, got)
+			t.Fatalf("symbol had wrong code. expected='%v', got='%v'", tt.expected, got)
 		}
 	}
 }

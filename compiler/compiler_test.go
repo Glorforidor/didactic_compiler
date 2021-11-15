@@ -683,6 +683,50 @@ func TestTypeStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestSelectorExpression(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `
+			type human struct{name string}
+			var x human
+			print x.name
+			`,
+			expected: `
+			.data
+			.L1: .string ""
+			x:
+			.dword .L1
+			.text
+			la t0, x
+			ld t0, 0(t0)
+			mv a0, t0
+			li a7, 4
+			ecall`,
+		},
+		{
+			input: `
+			type human struct{name string}
+
+			var x human
+
+			x.name = "Mads"
+			`,
+			expected: `
+			.data
+			.L1: .string ""
+			x:
+			.dword .L1
+			.L2: .string "Mads"
+			.text
+			la t0, x
+			la t1, .L2
+			sd t1, 0(t0)`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func TestFuncStatement(t *testing.T) {
 	tests := []compilerTest{
 		{
@@ -775,6 +819,42 @@ func TestFuncStatement(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestCallExpression(t *testing.T) {
+	tests := []compilerTest{
+		{
+			input: `
+			func greeter(x string) {
+				print x
+			}
+
+			greeter("Hello Compiler World")`,
+			expected: `
+			.data
+			.L1: .string "Hello Compiler World"
+			.text
+			la t0, .L1
+			mv a0, t0
+			call greeter
+			greeter:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			mv a0, t0
+			li a7, 4
+			ecall
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 func runCompilerTests(t *testing.T, tests []compilerTest) {
 	t.Helper()
 
@@ -784,7 +864,7 @@ func runCompilerTests(t *testing.T, tests []compilerTest) {
 	for _, tt := range tests {
 		program := parse(tt.input)
 
-		comp := New()
+		comp := newTest()
 
 		if err := comp.Compile(program); err != nil {
 			t.Fatalf("compiler error: %s", err)

@@ -10,6 +10,8 @@ type SymbolScope int
 const (
 	GlobalScope SymbolScope = iota
 	LocalScope
+	TypeScope
+	FuncScope
 )
 
 func (ss SymbolScope) String() string {
@@ -72,6 +74,32 @@ func NewEnclosedTable(outer *Table) *Table {
 	s := NewTable()
 	s.Outer = outer
 	return s
+}
+
+func (st *Table) DefineType(name string, t interface{}) (*Symbol, error) {
+	if s, ok := st.store[name]; ok {
+		// TODO: better error message - what scope? maybe just say the variable
+		// is already declared.
+		return s, fmt.Errorf("identifier: %q already defined in scope", name)
+	}
+
+	s := &Symbol{Name: name, Type: t, which: 0, Scope: TypeScope}
+	st.store[name] = s
+
+	return s, nil
+}
+
+func (st *Table) DefineFunc(name string, t interface{}) (*Symbol, error) {
+	if s, ok := st.store[name]; ok {
+		// TODO: better error message - what scope? maybe just say the variable
+		// is already declared.
+		return s, fmt.Errorf("identifier: %q already defined in scope", name)
+	}
+
+	s := &Symbol{Name: name, Type: t, which: 0, Scope: FuncScope}
+	st.store[name] = s
+
+	return s, nil
 }
 
 func (st *Table) Define(name string, t interface{}) (*Symbol, error) {

@@ -7,6 +7,9 @@ import (
 	"github.com/Glorforidor/didactic_compiler/symbol"
 )
 
+// funcPrototypes hold information about a function being a protype.
+var funcPrototypes = map[string]bool{}
+
 func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 	switch node := node.(type) {
 	case *ast.Program:
@@ -41,7 +44,7 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 	case *ast.TypeStatement:
-		if _, err := symbolTable.Define(node.Name.Value, node.Type); err != nil {
+		if _, err := symbolTable.DefineType(node.Name.Value, node.Type); err != nil {
 			return err
 		}
 	case *ast.AssignStatement:
@@ -79,21 +82,42 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 	case *ast.FuncStatement:
-		if _, err := symbolTable.Define(node.Name.Value, node.Name.Ttoken.Type); err != nil {
-			return err
+		_, ok := symbolTable.Resolve(node.Name.Value)
+		if !ok {
+			if _, err := symbolTable.DefineFunc(node.Name.Value, node.Signature); err != nil {
+				return err
+			} else {
+				funcPrototypes[node.Name.Value] = node.Body == nil
+			}
+		} else {
+			if !funcPrototypes[node.Name.Value] {
+				return fmt.Errorf("resolver: function: %q already defined", node.Name.Value)
+			}
+
+			funcPrototypes[node.Name.Value] = node.Body == nil
 		}
 
 		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
 
-		if node.Parameter != nil {
-			node.SymbolTable.Define(node.Parameter.Value, node.Parameter.Ttoken.Type)
+		if node.Signature.Parameter != nil {
+			node.SymbolTable.Define(node.Signature.Parameter.Value, node.Signature.Parameter.Ttoken.Type)
 		}
 
-		if err := Resolve(node.Body, node.SymbolTable); err != nil {
-			return err
+		if node.Body != nil {
+			if err := Resolve(node.Body, node.SymbolTable); err != nil {
+				return err
+			}
 		}
 	case *ast.ReturnStatement:
 		if err := Resolve(node.Value, symbolTable); err != nil {
+			return err
+		}
+	case *ast.CallExpression:
+		if err := Resolve(node.Function, symbolTable); err != nil {
+			return err
+		}
+
+		if err := Resolve(node.Argument, symbolTable); err != nil {
 			return err
 		}
 	case *ast.Identifier:
@@ -106,6 +130,10 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 		if err := Resolve(node.Right, symbolTable); err != nil {
+			return err
+		}
+	case *ast.SelectorExpression:
+		if err := Resolve(node.X, symbolTable); err != nil {
 			return err
 		}
 	}

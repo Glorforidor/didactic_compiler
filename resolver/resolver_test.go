@@ -153,6 +153,20 @@ x = 2`,
 		},
 		{
 			input: `
+			func test(x int);`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			var x int
+			func test(x int);
+			func test(x int) {
+				print x
+			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
 			func test(x int) {
 				print x
 			}`,
@@ -184,6 +198,31 @@ x = 2`,
 			func test(x int) int {
 				return x + 2
 			}`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			func test(x int) int {
+				return x + 2
+			}
+
+			test(2)`,
+			expectedToErr: false,
+		},
+		{
+			input: `
+			func test(x int) int {
+				return x + 2
+			}
+
+			test(x)`,
+			expectedToErr: true,
+		},
+		{
+			input: `
+			type human struct{name string}
+			var x human
+			x.name`,
 			expectedToErr: false,
 		},
 	}

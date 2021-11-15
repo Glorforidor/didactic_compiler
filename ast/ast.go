@@ -3,6 +3,7 @@
 package ast
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/Glorforidor/didactic_compiler/symbol"
@@ -127,7 +128,7 @@ func (vs *VarStatement) String() string {
 
 type AssignStatement struct {
 	Token token.Token // The token.Assign token.
-	Name  *Identifier
+	Name  Expression
 	Value Expression
 }
 
@@ -242,8 +243,7 @@ func (fs *ForStatement) String() string {
 type FuncStatement struct {
 	Token     token.Token // The token.Func token.
 	Name      *Identifier
-	Parameter *Identifier
-	Result    token.Token // Type token: token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident
+	Signature *FuncType
 	Body      *BlockStatement
 
 	SymbolTable *symbol.Table
@@ -257,19 +257,10 @@ func (fs *FuncStatement) String() string {
 	sb.WriteString("func")
 	sb.WriteString(" ")
 	sb.WriteString(fs.Name.String())
-	sb.WriteString("(")
-
-	if fs.Parameter != nil {
-		sb.WriteString(fs.Parameter.String())
+	sb.WriteString(fs.Signature.String())
+	if fs.Body != nil {
+		sb.WriteString(fs.Body.String())
 	}
-
-	sb.WriteString(")")
-	sb.WriteString(" ")
-	if fs.Result.Literal != "" {
-		sb.WriteString(fs.Result.Literal)
-		sb.WriteString(" ")
-	}
-	sb.WriteString(fs.Body.String())
 
 	return sb.String()
 }
@@ -321,8 +312,9 @@ func (id *Identifier) String() string {
 type IntegerLiteral struct {
 	Token token.Token // The token.Int token.
 	Value int64
-	Reg   string
-	T     types.Type
+
+	Reg string
+	T   types.Type
 }
 
 func (il *IntegerLiteral) expressionNode()      {}
@@ -334,8 +326,9 @@ func (il *IntegerLiteral) String() string       { return il.Token.Literal }
 type FloatLiteral struct {
 	Token token.Token // The token.Float token.
 	Value float64
-	Reg   string
-	T     types.Type
+
+	Reg string
+	T   types.Type
 }
 
 func (fl *FloatLiteral) expressionNode()      {}
@@ -347,21 +340,23 @@ func (fl *FloatLiteral) String() string       { return fl.Token.Literal }
 type StringLiteral struct {
 	Token token.Token // The token.String token.
 	Value string
-	Reg   string
-	T     types.Type
+
+	Reg string
+	T   types.Type
 }
 
 func (sl *StringLiteral) expressionNode()      {}
 func (sl *StringLiteral) Register() string     { return sl.Reg }
 func (sl *StringLiteral) Type() types.Type     { return sl.T }
 func (sl *StringLiteral) TokenLiteral() string { return sl.Token.Literal }
-func (sl *StringLiteral) String() string       { return sl.Token.Literal }
+func (sl *StringLiteral) String() string       { return fmt.Sprintf("%q", sl.Token.Literal) }
 
 type BoolLiteral struct {
 	Token token.Token // The token.Bool token.
 	Value bool
-	Reg   string
-	T     types.Type
+
+	Reg string
+	T   types.Type
 }
 
 func (bl *BoolLiteral) expressionNode()      {}
@@ -375,8 +370,9 @@ type InfixExpression struct {
 	Left     Expression
 	Operator string
 	Right    Expression
-	Reg      string
-	T        types.Type
+
+	Reg string
+	T   types.Type
 }
 
 func (ie *InfixExpression) expressionNode()      {}
@@ -391,6 +387,32 @@ func (ie *InfixExpression) String() string {
 	sb.WriteString(" " + ie.Operator + " ")
 	sb.WriteString(ie.Right.String())
 	sb.WriteString(")")
+
+	return sb.String()
+}
+
+type FuncType struct {
+	Token     token.Token // The token.Func token.
+	Parameter *Identifier
+	Result    token.Token // Type token: token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident
+}
+
+func (ft *FuncType) typeNode()            {}
+func (ft *FuncType) TokenLiteral() string { return ft.Token.Literal }
+func (ft *FuncType) String() string {
+	var sb strings.Builder
+
+	sb.WriteString("(")
+	if ft.Parameter != nil {
+		sb.WriteString(ft.Parameter.String())
+	}
+
+	sb.WriteString(")")
+	sb.WriteString(" ")
+	if ft.Result.Literal != "" {
+		sb.WriteString(ft.Result.Literal)
+		sb.WriteString(" ")
+	}
 
 	return sb.String()
 }
@@ -417,6 +439,53 @@ func (st *StructType) String() string {
 		sb.WriteString(";")
 	}
 	sb.WriteString("}")
+
+	return sb.String()
+}
+
+type SelectorExpression struct {
+	Token token.Token // The token.Period token.
+	X     Expression  // The lhs of the token.Period.
+	Field *Identifier // The rhs of the token.Period.
+
+	Reg string
+	T   types.Type
+}
+
+func (s *SelectorExpression) expressionNode()      {}
+func (s *SelectorExpression) Register() string     { return s.Reg }
+func (s *SelectorExpression) Type() types.Type     { return s.T }
+func (s *SelectorExpression) TokenLiteral() string { return s.Token.Literal }
+func (s *SelectorExpression) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(s.X.String())
+	sb.WriteString(s.Token.Literal)
+	sb.WriteString(s.Field.String())
+
+	return sb.String()
+}
+
+type CallExpression struct {
+	Token    token.Token // The token.Rparen token.
+	Function Expression
+	Argument Expression
+
+	Reg string
+	T   types.Type
+}
+
+func (c *CallExpression) expressionNode()      {}
+func (c *CallExpression) Register() string     { return c.Reg }
+func (c *CallExpression) Type() types.Type     { return c.T }
+func (c *CallExpression) TokenLiteral() string { return c.Token.Literal }
+func (c *CallExpression) String() string {
+	var sb strings.Builder
+
+	sb.WriteString(c.Function.String())
+	sb.WriteString("(")
+	sb.WriteString(c.Argument.String())
+	sb.WriteString(")")
 
 	return sb.String()
 }

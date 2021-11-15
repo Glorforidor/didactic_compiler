@@ -217,6 +217,51 @@ func TestTypeStatement(t *testing.T) {
 	}
 }
 
+func TestSelector(t *testing.T) {
+	tests := []struct {
+		input              string
+		expectedX          string
+		expectedIdentifier string
+	}{
+		{
+			input:              "x.name",
+			expectedX:          "x",
+			expectedIdentifier: "name",
+		},
+	}
+
+	for _, tt := range tests {
+		l := lexer.New(tt.input)
+		p := New(l)
+		program := p.ParseProgram()
+		checkParserError(t, p)
+
+		checkProgramLength(t, program)
+
+		stmt := program.Statements[0]
+		if stmt.TokenLiteral() != "x" {
+			t.Fatalf("stmt.TokenLiteral not %q. got=%q", tt.expectedX, stmt.TokenLiteral())
+		}
+
+		exprStmt, _ := stmt.(*ast.ExpressionStatement)
+
+		selector, ok := exprStmt.Expression.(*ast.SelectorExpression)
+		if !ok {
+			t.Fatalf("exprStmt is not an *ast.Selector. got=%T", selector)
+		}
+
+		if selector.TokenLiteral() != "." {
+			t.Fatalf("selector.TokenLiteral is not %q, got=%q", ".", selector.TokenLiteral())
+		}
+
+		if selector.X.TokenLiteral() != tt.expectedX {
+			t.Fatalf("selector.TokenLiteral is not %s. got=%s", tt.expectedX, selector.TokenLiteral())
+		}
+
+		testIdentifier(t, selector.Field, tt.expectedIdentifier)
+	}
+}
+
 type infix struct {
 	lhs      interface{}
 	operator string
@@ -260,11 +305,16 @@ func testAssignStatement(t *testing.T, stmt ast.Statement, id string, value inte
 		t.Fatalf("stmt not *ast.AssignStatement, got=%T", stmt)
 	}
 
-	if assignStmt.Name.Value != id {
-		t.Fatalf(
-			"assignStmt.Name.Value not %q, got=%q",
-			id, assignStmt.Name.Value,
-		)
+	switch v := assignStmt.Name.(type) {
+	case *ast.Identifier:
+		if v.Value != id {
+			t.Fatalf(
+				"assignStmt.Name.Value not %q, got=%q",
+				id, v.Value,
+			)
+		}
+	default:
+		t.Fatalf("lhs of assignment statement not testet")
 	}
 
 	if inf, ok := value.(infix); ok {
@@ -559,34 +609,57 @@ func TestFuncStatement(t *testing.T) {
 			t.Fatalf("funcStmt.Name is not %q, got=%q", tt.expectedName, funcStmt.Name)
 		}
 
-		if funcStmt.Parameter != nil {
-			if funcStmt.Parameter.Value != tt.expectedParamValue {
+		if funcStmt.Signature.Parameter != nil {
+			if funcStmt.Signature.Parameter.Value != tt.expectedParamValue {
 				t.Fatalf(
 					"funcStmt.Parameter.Value is not %q, got=%q",
 					tt.expectedParamValue,
-					funcStmt.Parameter.Value,
+					funcStmt.Signature.Parameter.Value,
 				)
 			}
 
-			if funcStmt.Parameter.Ttoken.Literal != tt.expectedParamType {
+			if funcStmt.Signature.Parameter.Ttoken.Literal != tt.expectedParamType {
 				t.Fatalf(
 					"funcStmt.Parameter.Ttoken.Literal is not %q, got=%q",
 					tt.expectedParamType,
-					funcStmt.Parameter.Ttoken.Literal,
+					funcStmt.Signature.Parameter.Ttoken.Literal,
 				)
 			}
 		}
 
-		if funcStmt.Result.Literal != tt.expectedResult {
+		if funcStmt.Signature.Result.Literal != tt.expectedResult {
 			t.Fatalf(
 				"funcStmt.Result is not %q, got=%q",
 				tt.expectedResult,
-				funcStmt.Result.Literal,
+				funcStmt.Signature.Result.Literal,
 			)
 		}
-
-		t.Logf("%+v", funcStmt)
 	}
+}
+
+func TestCallExpression(t *testing.T) {
+	input := "compile(2 + 2)"
+
+	l := lexer.New(input)
+	p := New(l)
+	program := p.ParseProgram()
+	checkParserError(t, p)
+	checkProgramLength(t, program)
+
+	stmt, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Fatalf("program.Statements[0] is not an ast.ExpressionStatement. got=%T",
+			program.Statements[0])
+	}
+
+	call, ok := stmt.Expression.(*ast.CallExpression)
+	if !ok {
+		t.Fatalf("stmt.Expression is not *ast.CallExpression. got=%T",
+			stmt.Expression)
+	}
+
+	testIdentifier(t, call.Function, "compile")
+	testInfixExpression(t, call.Argument, 2, "+", 2)
 }
 
 func TestInfixExpressions(t *testing.T) {

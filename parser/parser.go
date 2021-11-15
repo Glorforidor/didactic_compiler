@@ -59,6 +59,12 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfixFunc(token.NotEqual, p.parseInfixExpression)
 	p.registerInfixFunc(token.LessThan, p.parseInfixExpression)
 
+	// register call
+	p.registerInfixFunc(token.Lparen, p.parseCallExpression)
+
+	// register selector
+	p.registerInfixFunc(token.Period, p.parseSelectorExpression)
+
 	// Prime the parser, so curToken and peekToken are in the right positions.
 	p.nextToken()
 	p.nextToken()
@@ -83,6 +89,15 @@ func (p *Parser) peekTokenIs(ts ...token.TokenType) bool {
 	}
 
 	return false
+}
+
+func (p *Parser) expectSemi() bool {
+	// allow to omit a semicolon before '}' and ')'
+	if p.peekTokenIs(token.Rbrace) || p.peekTokenIs(token.Rparen) {
+		return true
+	}
+
+	return p.expectPeek(token.Semicolon)
 }
 
 // expectPeek advances to next token if the next token is expected.
@@ -163,16 +178,7 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.Return:
 		return p.parseReturnStatement()
 	default:
-		if p.curToken.Type == token.Ident && p.peekTokenIs(token.Assign) {
-			assign := p.parseAssignStatement()
-			if !p.expectPeek(token.Semicolon) {
-				return nil
-			}
-
-			return assign
-		}
-
-		return p.parseExpressionStatement()
+		return p.parseExpressionOrAssignStatement()
 	}
 }
 
@@ -331,7 +337,7 @@ func (p *Parser) parseBlockStatement() *ast.BlockStatement {
 	}
 
 	if p.curTokenIs(token.Eof) {
-		p.errorf("parser error: block statement was never closed")
+		p.errorf("block statement was never closed")
 		return nil
 	}
 
@@ -435,12 +441,23 @@ func (p *Parser) parseFuncStatement() *ast.FuncStatement {
 		return nil
 	}
 
-	stmt.Parameter = p.parseFuncParameter()
-
+	parameter := p.parseFuncParameter()
+	var result token.Token
 	if p.peekTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
 		p.nextToken() // advance to type
 
-		stmt.Result = p.curToken
+		result = p.curToken
+	}
+
+	stmt.Signature = &ast.FuncType{
+		Token:     stmt.Token,
+		Parameter: parameter,
+		Result:    result,
+	}
+
+	if p.peekTokenIs(token.Semicolon) {
+		p.nextToken()
+		return stmt
 	}
 
 	if !p.expectPeek(token.Lbrace) {
@@ -498,12 +515,43 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	return stmt
 }
 
+func (p *Parser) parseExpressionOrAssignStatement() ast.Statement {
+	// save this token for expression statement.
+	tok := p.curToken
+
+	expr := p.parseExpression(Lowest)
+
+	if p.peekTokenIs(token.Assign) {
+		stmt := &ast.AssignStatement{Name: expr}
+
+		p.nextToken() // advance to the "="
+		stmt.Token = p.curToken
+
+		p.nextToken() // advance to the value
+		stmt.Value = p.parseExpression(Lowest)
+
+		if !p.expectSemi() {
+			return nil
+		}
+
+		return stmt
+	}
+
+	stmt := &ast.ExpressionStatement{Token: tok, Expression: expr}
+
+	if !p.expectSemi() {
+		return nil
+	}
+
+	return stmt
+}
+
 func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 	stmt := &ast.ExpressionStatement{Token: p.curToken}
 	stmt.Expression = p.parseExpression(Lowest)
 
-	if p.peekTokenIs(token.Semicolon) {
-		p.nextToken()
+	if !p.expectSemi() {
+		return nil
 	}
 
 	return stmt
@@ -546,6 +594,8 @@ const (
 	Less    // <
 	Sum     // +
 	Product // *
+	Call    // (
+	Period  // .
 )
 
 var precedences = map[token.TokenType]int{
@@ -556,6 +606,8 @@ var precedences = map[token.TokenType]int{
 	token.Minus:    Sum,
 	token.Asterisk: Product,
 	token.Slash:    Product,
+	token.Lparen:   Call,
+	token.Period:   Period,
 }
 
 func (p *Parser) curPrecedence() int {
@@ -572,6 +624,38 @@ func (p *Parser) peekPrecedence() int {
 	}
 
 	return Lowest
+}
+
+func (p *Parser) parseSelectorExpression(left ast.Expression) ast.Expression {
+	expression := &ast.SelectorExpression{
+		Token: p.curToken,
+		X:     left,
+	}
+
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expr := p.parseExpression(precedence)
+
+	id, ok := expr.(*ast.Identifier)
+	if !ok {
+		p.errorf("selector field was not an identifier, was: %s", expr)
+		return nil
+	}
+
+	expression.Field = id
+
+	return expression
+}
+
+func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
+	expression := &ast.CallExpression{Token: p.curToken, Function: function}
+	if p.peekTokenIs(token.Rparen) {
+		p.nextToken()
+	} else {
+		expression.Argument = p.parseExpression(Lowest)
+	}
+
+	return expression
 }
 
 func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {

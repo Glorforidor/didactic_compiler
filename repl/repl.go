@@ -21,7 +21,7 @@ func Start(in io.Reader, out io.Writer) {
 	t := symbol.NewTable()
 
 	for {
-		fmt.Fprintf(out, prompt)
+		fmt.Fprint(out, prompt)
 		scanned := scanner.Scan()
 		if !scanned {
 			return

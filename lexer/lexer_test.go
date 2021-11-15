@@ -28,6 +28,8 @@ func TestNextToken(t *testing.T) {
 	func greet(x int) { }
 	type human struct{name string}
 	return 2
+	x.name
+	greet(2)
 `
 
 	tests := []struct {
@@ -117,6 +119,13 @@ func TestNextToken(t *testing.T) {
 		{token.Rbrace, "}"},
 		{token.Return, "return"},
 		{token.Int, "2"},
+		{token.Ident, "x"},
+		{token.Period, "."},
+		{token.Ident, "name"},
+		{token.Ident, "greet"},
+		{token.Lparen, "("},
+		{token.Int, "2"},
+		{token.Rparen, ")"},
 		{token.Eof, ""},
 	}
 

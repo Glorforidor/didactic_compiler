@@ -30,6 +30,9 @@ const (
 	Lbrace TokenType = "{"
 	Rbrace TokenType = "}"
 
+	// Selector
+	Period TokenType = "."
+
 	// Delimiters
 	Semicolon TokenType = ";"
 

@@ -63,6 +63,10 @@ func (l *Lexer) makeTwoCharToken(t token.TokenType) token.Token {
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
+	if l.ch == '/' && l.peek() == '/' {
+		l.skipComment()
+	}
+
 	var insertSemi bool
 
 	var tok token.Token
@@ -107,6 +111,8 @@ func (l *Lexer) NextToken() token.Token {
 		tok.Type = token.String
 		tok.Literal = l.readString()
 		insertSemi = true
+	case '.':
+		tok = newToken(token.Period, l.ch)
 	case eof:
 		if l.insertSemi {
 			l.insertSemi = false
@@ -233,6 +239,16 @@ func (l *Lexer) readString() string {
 	}
 
 	return l.input[position:l.position]
+}
+
+func (l *Lexer) skipComment() {
+	for l.ch != '\n' && l.ch != '\r' {
+		l.readChar()
+	}
+
+	// remove whitespace after the comment, otherwise it will treat whitespace
+	// as tokens that needs to be lexed, which results in illegal tokens.
+	l.skipWhiteSpace()
 }
 
 func (l *Lexer) skipWhiteSpace() {

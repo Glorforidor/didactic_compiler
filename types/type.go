@@ -8,6 +8,7 @@ type kind int
 
 const (
 	Unknown kind = iota
+	Nil
 	Int
 	Float
 	String
@@ -31,13 +32,12 @@ func (b *Basic) String() string { return b.name }
 
 var Typ = []*Basic{
 	Unknown: {kind: Unknown, name: "unknown"},
+	Nil:     {kind: Nil, name: "nil"},
 	Int:     {kind: Int, name: "int"},
 	Float:   {kind: Float, name: "float"},
 	String:  {kind: String, name: "string"},
 	Bool:    {kind: Bool, name: "bool"},
 }
-
-// TODO: fix the kind of signature and struct
 
 type Signature struct {
 	Parameter Type
@@ -48,13 +48,15 @@ func (s *Signature) Kind() kind { return Func }
 func (s *Signature) String() string {
 	var sb strings.Builder
 
+	sb.WriteString("(")
 	if s.Parameter != nil {
 		sb.WriteString(s.Parameter.String())
 	}
+	sb.WriteString(",")
 	if s.Result != nil {
-		sb.WriteString(" ")
 		sb.WriteString(s.Result.String())
 	}
+	sb.WriteString(")")
 
 	return sb.String()
 }

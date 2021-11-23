@@ -283,7 +283,7 @@ func TestVarStatement(t *testing.T) {
 			.data
 			x: .dword 0
 			.text
-			la t0, x`,
+			la s1, x`,
 		},
 		{
 			input: "var x int = 2",
@@ -291,9 +291,9 @@ func TestVarStatement(t *testing.T) {
 			.data
 			x: .dword 0
 			.text
-			la t0, x
-			li t1, 2
-			sd t1, 0(t0)`,
+			la s1, x
+			li t0, 2
+			sd t0, 0(s1)`,
 		},
 		{
 			input: `
@@ -302,10 +302,13 @@ func TestVarStatement(t *testing.T) {
 			`,
 			expected: `
 			.data
-			.L1: .string ""
-			x:
-			.dword .L1
+			x: .dword 0
 			.text
+			li a0, 8
+			li a7, 9
+			ecall
+			la t0, x
+			sd a0, 0(t0)
 			`,
 		},
 		{
@@ -318,11 +321,13 @@ func TestVarStatement(t *testing.T) {
 			`,
 			expected: `
 			.data
-			.L1: .string ""
-			x:
-			.dword .L1
-			.dword 0
+			x: .dword 0
 			.text
+			li a0, 16
+			li a7, 9
+			ecall
+			la t0, x
+			sd a0, 0(t0)
 			`,
 		},
 	}
@@ -341,9 +346,9 @@ func TestAssignStatement(t *testing.T) {
 			.data
 			x: .dword 0
 			.text
-			la t0, x
-			li t1, 2
-			sd t1, 0(t0)`,
+			la s1, x
+			li t0, 2
+			sd t0, 0(s1)`,
 		},
 		{
 			input: `
@@ -355,9 +360,9 @@ func TestAssignStatement(t *testing.T) {
 			x: .double 0
 			.L1: .double 2
 			.text
-			la t0, x
-			fld ft0, .L1, t1
-			fsd ft0, 0(t0)`,
+			la s1, x
+			fld ft0, .L1, t0
+			fsd ft0, 0(s1)`,
 		},
 		{
 			input: `
@@ -369,9 +374,9 @@ func TestAssignStatement(t *testing.T) {
 			x: .dword 0
 			.L1: .string "Hello Compiler World"
 			.text
-			la t0, x
-			la t1, .L1
-			sd t1, 0(t0)`,
+			la s1, x
+			la t0, .L1
+			sd t0, 0(s1)`,
 		},
 	}
 
@@ -693,13 +698,17 @@ func TestSelectorExpression(t *testing.T) {
 			`,
 			expected: `
 			.data
-			.L1: .string ""
-			x:
-			.dword .L1
+			x: .dword 0
 			.text
+			li a0, 8
+			li a7, 9
+			ecall
 			la t0, x
-			ld t0, 0(t0)
-			mv a0, t0
+			sd a0, 0(t0)
+			la s1, x
+			ld s1, 0(s1)
+			ld s1, 0(s1)
+			mv a0, s1
 			li a7, 4
 			ecall`,
 		},
@@ -713,14 +722,18 @@ func TestSelectorExpression(t *testing.T) {
 			`,
 			expected: `
 			.data
-			.L1: .string ""
-			x:
-			.dword .L1
-			.L2: .string "Mads"
+			x: .dword 0
+			.L1: .string "Mads"
 			.text
+			li a0, 8
+			li a7, 9
+			ecall
 			la t0, x
-			la t1, .L2
-			sd t1, 0(t0)`,
+			sd a0, 0(t0)
+			la s1, x
+			ld s1, 0(s1)
+			la t0, .L1
+			sd t0, 0(s1)`,
 		},
 	}
 
@@ -744,6 +757,7 @@ func TestFuncStatement(t *testing.T) {
 			mv a0, t0
 			li a7, 1
 			ecall
+			greeter.epilogue:
 			addi sp, sp, 0
 			ld ra, 16(sp)
 			addi sp, sp, 16
@@ -766,6 +780,7 @@ func TestFuncStatement(t *testing.T) {
 			mv a0, t0
 			li a7, 1
 			ecall
+			greeter.epilogue:
 			addi sp, sp, 0
 			ld ra, 16(sp)
 			addi sp, sp, 16
@@ -788,6 +803,7 @@ func TestFuncStatement(t *testing.T) {
 			mv a0, t0
 			li a7, 4
 			ecall
+			greeter.epilogue:
 			addi sp, sp, 0
 			ld ra, 16(sp)
 			addi sp, sp, 16
@@ -808,6 +824,61 @@ func TestFuncStatement(t *testing.T) {
 			addi sp, sp, -0
 			ld t0, 8(sp)
 			mv a0, t0
+			j greeter.epilogue
+			greeter.epilogue:
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+		{
+			input: `
+			type human struct{name string; age int}
+			func greeter() human {
+				var x human
+				return x
+			}`,
+			expected: `
+			.data
+			.text
+			greeter:
+			addi sp, sp, -16
+			sd ra, 16(sp)
+			addi sp, sp, -16
+			li a0, 16
+			li a7, 9
+			ecall
+			sd a0, 8(sp)
+			ld t0, 8(sp)
+			mv a0, t0
+			j greeter.epilogue
+			greeter.epilogue:
+			addi sp, sp, 16
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+		{
+			input: `
+			type human struct{name string; age int}
+			func greeter(x human) int {
+				return x.age
+			}`,
+			expected: `
+			.data
+			.text
+			greeter:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			ld t0, 8(t0)
+			mv a0, t0
+			j greeter.epilogue
+			greeter.epilogue:
 			addi sp, sp, 0
 			ld ra, 16(sp)
 			addi sp, sp, 16
@@ -844,6 +915,58 @@ func TestCallExpression(t *testing.T) {
 			mv a0, t0
 			li a7, 4
 			ecall
+			greeter.epilogue:
+			addi sp, sp, 0
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+		{
+			input: `
+			type human struct{name string; age int}
+			func greeter(x human) {
+				print x.age
+			}
+
+			var h human
+			h.name = "Didac"
+			h.age = 0
+
+			greeter(h)`,
+			expected: `
+			.data
+			h: .dword 0
+			.L1: .string "Didac"
+			.text
+			li a0, 16
+			li a7, 9
+			ecall
+			la t0, h
+			sd a0, 0(t0)
+			la s1, h
+			ld s1, 0(s1)
+			la t0, .L1
+			sd t0, 0(s1)
+			la s1, h
+			ld s1, 0(s1)
+			li t0, 0
+			sd t0, 8(s1)
+			la s1, h
+			ld s1, 0(s1)
+			mv a0, s1
+			call greeter
+			greeter:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			ld t0, 8(t0)
+			mv a0, t0
+			li a7, 1
+			ecall
+			greeter.epilogue:
 			addi sp, sp, 0
 			ld ra, 16(sp)
 			addi sp, sp, 16

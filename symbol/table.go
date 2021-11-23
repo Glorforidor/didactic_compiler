@@ -3,8 +3,6 @@ package symbol
 import (
 	"fmt"
 	"sort"
-
-	"github.com/Glorforidor/didactic_compiler/types"
 )
 
 type SymbolScope int
@@ -138,25 +136,6 @@ func (st *Table) Define(name string, t interface{}) (*Symbol, error) {
 	return s, nil
 }
 
-// size calculates the size needed on the stack to accomendate the type. The
-// Basic types always allocate 8 as we target the RV64. If it is a struct type
-// the size is all the fields combined.
-func size(t interface{}) int {
-	switch v := t.(type) {
-	case *types.Basic:
-		return 8
-	case *types.Struct:
-		var space int
-		for _, f := range v.Fields {
-			space += size(f.Type)
-		}
-
-		return space
-	}
-
-	return 0
-}
-
 // ComputeStack how much stack space each block will accomendate and also sets
 // the symbols stack offset.
 func (st *Table) ComputeStack() {
@@ -170,7 +149,7 @@ func (st *Table) ComputeStack() {
 
 	// The first element on the stack is always at 8(sp). Writing to 0(sp)
 	// should always be safe and should never overwrite other data.
-	x := 8
+	x := variableSize
 
 	for _, k := range keys {
 		v := st.store[k]
@@ -179,13 +158,13 @@ func (st *Table) ComputeStack() {
 		}
 
 		v.stackPoint = x
-		x += size(v.Type)
+		x += variableSize
 	}
 
 	// The stack space always need to be 16 byte alligned. We subtract 8 from x
 	// since we add that extra 8 as offset.
-	if (x-8)%16 == 0 {
-		st.stackSpace = x - 8
+	if (x-variableSize)%16 == 0 {
+		st.stackSpace = x - variableSize
 	} else {
 		st.stackSpace = x
 	}
@@ -210,8 +189,5 @@ func (st *Table) resolve(name string, stackOffset int) (*Symbol, bool) {
 }
 
 func (st *Table) StackSpace() int {
-	// x := math.Round(float64(st.numDefinitions) / 2)
-	// y := x * 16
-	// return int(y)
 	return st.stackSpace
 }

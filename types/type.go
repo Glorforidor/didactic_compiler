@@ -98,3 +98,12 @@ func (s *Struct) String() string {
 
 	return sb.String()
 }
+
+func (s *Struct) Size() int {
+	var space int
+	for range s.Fields {
+		space += 8
+	}
+
+	return space
+}

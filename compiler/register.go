@@ -6,7 +6,7 @@ import (
 )
 
 type registerTable struct {
-	general, floating map[string]bool
+	general, generalSaved, floating map[string]bool
 }
 
 func riscvTable() *registerTable {
@@ -19,6 +19,19 @@ func riscvTable() *registerTable {
 			"t4": false,
 			"t5": false,
 			"t6": false,
+		},
+		generalSaved: map[string]bool{
+			"s1":  false,
+			"s2":  false,
+			"s3":  false,
+			"s4":  false,
+			"s5":  false,
+			"s6":  false,
+			"s7":  false,
+			"s8":  false,
+			"s9":  false,
+			"s10": false,
+			"s11": false,
 		},
 		floating: map[string]bool{
 			"ft0":  false,
@@ -35,6 +48,23 @@ func riscvTable() *registerTable {
 			"ft11": false,
 		},
 	}
+}
+
+func (rt *registerTable) allocGeneralSaved() (string, error) {
+	var generalSaveds []string
+	for k := range rt.generalSaved {
+		generalSaveds = append(generalSaveds, k)
+	}
+	sort.Strings(generalSaveds)
+
+	for _, v := range generalSaveds {
+		if !rt.generalSaved[v] {
+			rt.generalSaved[v] = true
+			return v, nil
+		}
+	}
+
+	return "", fmt.Errorf("no more general register available: %v", rt.general)
 }
 
 func (rt *registerTable) allocGeneral() (string, error) {
@@ -76,5 +106,7 @@ func (rt *registerTable) dealloc(reg string) {
 		rt.general[reg] = false
 	} else if _, ok := rt.floating[reg]; ok {
 		rt.floating[reg] = false
+	} else if _, ok := rt.generalSaved[reg]; ok {
+		rt.generalSaved[reg] = false
 	}
 }

@@ -1,3 +1,5 @@
+// Package checker type checks the AST produced by the parser package and
+// annotates the AST nodes with the proper types.
 package checker
 
 import (
@@ -13,6 +15,9 @@ import (
 func Check(program *ast.Program) error {
 	return check(program, program.SymbolTable)
 }
+
+
+var currentFunc *ast.Identifier
 
 func check(node ast.Node, symbolTable *symbol.Table) error {
 	switch node := node.(type) {
@@ -167,6 +172,12 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 	case *ast.FuncStatement:
+		currentFunc = node.Name
+		// TODO: Could maybe have a stack of functions if the function is
+		// defined within a function.
+		// Remove the function after it has been used.
+		defer func() { currentFunc = nil }()
+
 		var signature types.Signature
 
 		var parameter types.Type
@@ -226,12 +237,21 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		}
 
 		node.Name.T = &signature
+
+		// Update the symbol of function to its proper type.
 		sym, _ := symbolTable.Resolve(node.Name.Value)
 		sym.Type = node.Name.T
 	case *ast.ReturnStatement:
+		if currentFunc == nil {
+			return fmt.Errorf("checker error: Return statement can not be declared outside of function")
+		}
+
 		if err := check(node.Value, symbolTable); err != nil {
 			return err
 		}
+
+		// Save the function identifier into the return.
+		node.Function = currentFunc
 	case *ast.CallExpression:
 		if err := check(node.Function, symbolTable); err != nil {
 			return err
@@ -254,7 +274,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		if node.Argument == nil {
 			if sig.Parameter.Kind() != types.Nil {
 				// TODO: Better error message here will be great.
-				return fmt.Errorf("type error: function takes arguements, non was provided")
+				return fmt.Errorf("type error: function: %q takes arguments, non was provided", node.Function.(*ast.Identifier).Value)
 			}
 		} else if !reflect.DeepEqual(sig.Parameter, node.Argument.Type()) {
 			return fmt.Errorf(
@@ -269,39 +289,35 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 	case *ast.Identifier:
 		sym, _ := symbolTable.Resolve(node.Value)
 
-		switch sym.Type {
-		case token.IntType:
-			node.T = types.Typ[types.Int]
-			sym.Type = node.T
-		case token.FloatType:
-			node.T = types.Typ[types.Float]
-			sym.Type = node.T
-		case token.StringType:
-			node.T = types.Typ[types.String]
-			sym.Type = node.T
-		case token.BoolType:
-			node.T = types.Typ[types.Bool]
-			sym.Type = node.T
-		case token.Ident:
-			// TODO: check that if an identifier has another identifier as
-			// type, that it is a struct or function.
-			// identifier must be a struct or func type.
-			s, _ := symbolTable.Resolve(node.Ttoken.Literal)
-			node.T = s.Type.(*types.Struct)
-			sym.Type = node.T
-		default:
-			if _, ok := sym.Type.(ast.TypeNode); ok {
-				// let the other switch construct the proper type.
-				break
-			}
-
-			// assert that the end type is a proper type.
-			if _, ok := sym.Type.(types.Type); !ok {
-				panic(fmt.Sprintf("the symbol: %s should have been updated with the proper type. %v", sym.Name, sym.Type))
-			}
-		}
-
 		switch v := sym.Type.(type) {
+		case token.TokenType:
+			switch v {
+			case token.IntType:
+				node.T = types.Typ[types.Int]
+				sym.Type = node.T
+			case token.FloatType:
+				node.T = types.Typ[types.Float]
+				sym.Type = node.T
+			case token.StringType:
+				node.T = types.Typ[types.String]
+				sym.Type = node.T
+			case token.BoolType:
+				node.T = types.Typ[types.Bool]
+				sym.Type = node.T
+			case token.Ident:
+				// TODO: check that if an identifier has another identifier as
+				// type, that it is a struct or function.
+				// identifier must be a struct or func type.
+				s, _ := symbolTable.Resolve(node.Ttoken.Literal)
+				node.T = s.Type.(*types.Struct)
+				sym.Type = node.T
+			}
+		case *types.Struct:
+			node.T = v
+		case *types.Basic:
+			node.T = v
+		case *types.Signature:
+			node.T = v
 		case *ast.StructType:
 			if err := check(v, symbolTable); err != nil {
 				return err
@@ -316,12 +332,6 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 
 			node.T = &types.Struct{Fields: fields}
 			sym.Type = node.T
-		case *types.Struct:
-			node.T = v
-		case *types.Basic:
-			node.T = v
-		case *types.Signature:
-			node.T = v
 		default:
 			return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Ttoken)
 		}

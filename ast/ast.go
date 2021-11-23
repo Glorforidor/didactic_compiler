@@ -451,6 +451,8 @@ type SelectorExpression struct {
 
 	Reg string
 	T   types.Type
+
+	Offset int // Offset to the field in X.
 }
 
 func (s *SelectorExpression) expressionNode()      {}
@@ -485,7 +487,9 @@ func (c *CallExpression) String() string {
 
 	sb.WriteString(c.Function.String())
 	sb.WriteString("(")
-	sb.WriteString(c.Argument.String())
+	if c.Argument != nil {
+		sb.WriteString(c.Argument.String())
+	}
 	sb.WriteString(")")
 
 	return sb.String()

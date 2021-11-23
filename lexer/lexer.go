@@ -3,8 +3,6 @@
 package lexer
 
 import (
-	"fmt"
-
 	"github.com/Glorforidor/didactic_compiler/token"
 )
 
@@ -63,7 +61,7 @@ func (l *Lexer) makeTwoCharToken(t token.TokenType) token.Token {
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpace()
 
-	if l.ch == '/' && l.peek() == '/' {
+	for l.ch == '/' && l.peek() == '/' {
 		l.skipComment()
 	}
 
@@ -158,9 +156,6 @@ func (l *Lexer) NextToken() token.Token {
 	// NextToken.
 
 	l.readChar()
-	if tok.Literal == "print" {
-		fmt.Println(l.ch)
-	}
 
 	return tok
 }

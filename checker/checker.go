@@ -16,6 +16,7 @@ func Check(program *ast.Program) error {
 	return check(program, program.SymbolTable)
 }
 
+const wordAllignment = 8
 
 var currentFunc *ast.Identifier
 
@@ -95,16 +96,34 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 					v,
 				)
 			}
-			if !identifierInStruct(node.Field, x) {
+			offset, ok := identifierInStruct(node.Field, x)
+			if !ok {
 				return fmt.Errorf(
 					"type error: identifier: %s is not a field in struct: %s",
 					node.Field.Value,
 					v.Value,
 				)
 			}
-
+			node.Offset = offset
+		case *ast.CallExpression:
+			x, ok := v.T.(*types.Struct)
+			if !ok {
+				return fmt.Errorf(
+					"type error: selecting field on identifier: %s, which is not a struct",
+					v,
+				)
+			}
+			offset, ok := identifierInStruct(node.Field, x)
+			if !ok {
+				return fmt.Errorf(
+					"type error: identifier: %s is not a field in struct: %s",
+					node.Field.Value,
+					v,
+				)
+			}
+			node.Offset = offset
 		default:
-			return fmt.Errorf("type error: select X is not an Identifier")
+			return fmt.Errorf("type error: select X is not an Identifier. got=%T", v)
 		}
 
 		node.T = node.Field.T
@@ -385,15 +404,15 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 // identifierInStruct checks if the identifier is in the struct. If it is, then
 // updates that identifier with the same type as the one in the struct and
 // returns true. Otherwise returns false.
-func identifierInStruct(id *ast.Identifier, s *types.Struct) bool {
-	for _, f := range s.Fields {
+func identifierInStruct(id *ast.Identifier, s *types.Struct) (int, bool) {
+	for i, f := range s.Fields {
 		if f.Name == id.Value {
 			id.T = f.Type
-			return true
+			return i * wordAllignment, true
 		}
 	}
 
-	return false
+	return 0, false
 }
 
 func tokenToType(t token.Token) types.Type {

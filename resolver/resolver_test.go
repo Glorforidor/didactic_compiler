@@ -227,7 +227,7 @@ x = 2`,
 		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		program := parse(tt.input)
 		symbolTable := symbol.NewTable()
 
@@ -238,7 +238,7 @@ x = 2`,
 		}
 
 		if err != nil && !tt.expectedToErr {
-			t.Fatalf("expected not to fail, got: %s", err)
+			t.Fatalf("test[%d]: expected not to fail, got: %s",i, err)
 		}
 	}
 }

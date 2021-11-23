@@ -100,7 +100,12 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
 
 		if node.Signature.Parameter != nil {
-			node.SymbolTable.Define(node.Signature.Parameter.Value, node.Signature.Parameter.Ttoken.Type)
+			// Allow the parameter to over shadow a global variable of same
+			// name.
+			node.SymbolTable.DefineInFunc(
+				node.Signature.Parameter.Value,
+				node.Signature.Parameter.Ttoken.Type,
+			)
 		}
 
 		if node.Body != nil {

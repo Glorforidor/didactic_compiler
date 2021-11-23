@@ -103,6 +103,18 @@ func (st *Table) DefineFunc(name string, t interface{}) (*Symbol, error) {
 	return s, nil
 }
 
+// DefineInFunc is used for defining the function parameter. Which will always
+// have the local scope.
+func (st *Table) DefineInFunc(name string, t interface{}) *Symbol {
+	s := &Symbol{Name: name, Type: t, which: st.numDefinitions, Scope: LocalScope}
+	st.store[name] = s
+	st.numDefinitions++
+
+	return s
+}
+
+// Define defines the name with type t into the symbol table. It will check
+// that the variable does not over shadow a symbol with the same name.
 func (st *Table) Define(name string, t interface{}) (*Symbol, error) {
 	if s, ok := st.store[name]; ok {
 		// TODO: better error message - what scope? maybe just say the variable

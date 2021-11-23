@@ -266,8 +266,9 @@ func (fs *FuncStatement) String() string {
 }
 
 type ReturnStatement struct {
-	Token token.Token // The token.Return token.
-	Value Expression
+	Token    token.Token // The token.Return token.
+	Value    Expression  // The value to return.
+	Function *Identifier // The function the return resides in.
 }
 
 func (rs *ReturnStatement) statementNode()       {}

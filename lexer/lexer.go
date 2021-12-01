@@ -43,8 +43,10 @@ func (l *Lexer) readChar() {
 	l.readPosition += 1
 }
 
-const eof byte = 0
-const newline byte = '\n'
+const (
+	eof     byte = 0
+	newline byte = '\n'
+)
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}

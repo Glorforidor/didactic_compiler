@@ -8,6 +8,7 @@ const (
 	// Misc
 	Illegal TokenType = "ILLEGAL"
 	Eof     TokenType = "EOF"
+	Blank   TokenType = "_"
 
 	// Identifier
 	Ident TokenType = "IDENT" // foo, bar, foobar, x, y, z, ...

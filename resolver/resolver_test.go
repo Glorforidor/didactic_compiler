@@ -238,7 +238,7 @@ x = 2`,
 		}
 
 		if err != nil && !tt.expectedToErr {
-			t.Fatalf("test[%d]: expected not to fail, got: %s",i, err)
+			t.Fatalf("test[%d]: expected not to fail, got: %s", i, err)
 		}
 	}
 }

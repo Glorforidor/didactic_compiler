@@ -40,7 +40,7 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if err := Resolve(node.Value, symbolTable); err != nil {
 			return err
 		}
-		if _, err := symbolTable.Define(node.Name.Value, node.Name.Ttoken.Type); err != nil {
+		if _, err := symbolTable.Define(node.Name.Value, node.Name.Tnode); err != nil {
 			return err
 		}
 	case *ast.TypeStatement:
@@ -100,12 +100,20 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
 
 		if node.Signature.Parameter != nil {
-			// Allow the parameter to over shadow a global variable of same
-			// name.
-			node.SymbolTable.DefineInFunc(
-				node.Signature.Parameter.Value,
-				node.Signature.Parameter.Ttoken.Type,
-			)
+			s, ok := node.SymbolTable.Resolve(node.Signature.Parameter.Value)
+			if ok && s.Scope == symbol.TypeScope {
+				node.SymbolTable.DefineInFunc(
+					node.Signature.Parameter.Value,
+					s.Type,
+				)
+			} else {
+				// Allow the parameter to over shadow a global variable of same
+				// name.
+				node.SymbolTable.DefineInFunc(
+					node.Signature.Parameter.Value,
+					node.Signature.Parameter.Tnode,
+				)
+			}
 		}
 
 		if node.Body != nil {

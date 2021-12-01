@@ -55,7 +55,8 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 
-		if node.Name.T != node.Value.Type() {
+		if !reflect.DeepEqual(node.Name.T, node.Value.Type()) {
+			// if node.Name.T != node.Value.Type() {
 			return fmt.Errorf(
 				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name.Value,
@@ -73,13 +74,17 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		}
 	case *ast.StructType:
 		for _, f := range node.Fields {
-			// In struct only allow for basic types
+			switch t := f.Tnode.(type) {
+			case *ast.BasicType:
+				// In struct only allow for basic types
+				if t.Token.Type == token.Ident {
+					return fmt.Errorf("type error: struct fields can only be a basic type [int, float, bool, string].")
+				}
 
-			// TODO: maybe later allow for struct inside structs.
-			if f.Ttoken.Type == token.Ident {
-				return fmt.Errorf("type error: struct fields can only be a basic type")
-			} else {
-				f.T = tokenToType(f.Ttoken)
+				f.T = typeNodetoType(t)
+			default:
+				// TODO: maybe later allow for struct inside structs.
+				panic("StructType containing fields of other types than BasicType is not implemented")
 			}
 		}
 	case *ast.SelectorExpression:
@@ -136,7 +141,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return err
 		}
 
-		if node.Name.Type() != node.Value.Type() {
+		if !reflect.DeepEqual(node.Name.Type(), node.Value.Type()) {
 			return fmt.Errorf(
 				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name,
@@ -193,43 +198,22 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 	case *ast.FuncStatement:
 		currentFunc = node.Name
 		// TODO: Could maybe have a stack of functions if the function is
-		// defined within a function.
-		// Remove the function after it has been used.
+		// defined within a function. Remove the function after it has been
+		// used.
 		defer func() { currentFunc = nil }()
 
-		var signature types.Signature
-
-		var parameter types.Type
-		if node.Signature.Parameter != nil {
-			if err := check(node.Signature.Parameter, node.SymbolTable); err != nil {
-				return err
-			}
-
-			parameter = node.Signature.Parameter.T
-		} else {
-			parameter = types.Typ[types.Nil]
+		signature, err := funcTypeToSignature(node.Signature, node.SymbolTable)
+		if err != nil {
+			return err
 		}
-		signature.Parameter = parameter
 
-		var result types.Type
-		// TODO: remember that result can be Ident (struct) or a func type.
-		if node.Signature.Result.Literal != "" {
-			if node.Signature.Result.Type == token.Ident {
-				sym, _ := symbolTable.Resolve(node.Signature.Result.Literal)
-				result = sym.Type.(*types.Struct)
-			} else {
-				result = tokenToType(node.Signature.Result)
-			}
-		} else {
-			result = types.Typ[types.Nil]
-		}
-		signature.Result = result
+		node.Name.T = signature
 
 		if node.Body != nil {
 			// special case that a prototype have been defined
 			sym, _ := symbolTable.Resolve(node.Name.Value)
 			if v, ok := sym.Type.(*types.Signature); ok {
-				if !reflect.DeepEqual(signature, *v) {
+				if !reflect.DeepEqual(*signature, *v) {
 					return fmt.Errorf("type error: function: %q's prototype and definition differ in signature", node.Name.Value)
 				}
 			}
@@ -238,24 +222,14 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				return err
 			}
 
-			// TODO: Now we only check that the last statement is a return
-			// statement and bail out if it is not. We should probably also loop
-			// over the body and check for multiple return statements (early
-			// returns) and see if they have the correct type.
-			if result.Kind() != types.Nil {
+			if signature.Result.Kind() != types.Nil {
 				lastIndex := len(node.Body.Statements) - 1
-				n, ok := node.Body.Statements[lastIndex].(*ast.ReturnStatement)
+				_, ok := node.Body.Statements[lastIndex].(*ast.ReturnStatement)
 				if !ok {
 					return fmt.Errorf("type error: function: %s, is missing return statement at the end", node.Name)
 				}
-
-				if n.Value.Type() != result {
-					return fmt.Errorf("type error: function: %s, returns type: %s, but expect to return: %s", node.Name, n.Value.Type(), result)
-				}
 			}
 		}
-
-		node.Name.T = &signature
 
 		// Update the symbol of function to its proper type.
 		sym, _ := symbolTable.Resolve(node.Name.Value)
@@ -265,12 +239,26 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			return fmt.Errorf("checker error: Return statement can not be declared outside of function")
 		}
 
+		// Save the function identifier into the return.
+		node.Function = currentFunc
+
+		result := currentFunc.T.(*types.Signature).Result
+
+		if node.Value == nil {
+			if result.Kind() != types.Nil {
+				return fmt.Errorf("type error: function: %q was expected to return %q", currentFunc.Value, result)
+			}
+
+			return nil
+		}
+
 		if err := check(node.Value, symbolTable); err != nil {
 			return err
 		}
 
-		// Save the function identifier into the return.
-		node.Function = currentFunc
+		if !reflect.DeepEqual(node.Value.Type(), result) {
+			return fmt.Errorf("type error: function: %q, returns type: %s, but expected to return: %s", currentFunc.Value, node.Value.Type(), result)
+		}
 	case *ast.CallExpression:
 		if err := check(node.Function, symbolTable); err != nil {
 			return err
@@ -306,29 +294,32 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 
 		node.T = sig.Result
 	case *ast.Identifier:
-		sym, _ := symbolTable.Resolve(node.Value)
+		sym, ok := symbolTable.Resolve(node.Value)
+		if !ok {
+			if node.Token.Type == token.Blank {
+				node.T = typeNodetoType(node.Tnode)
+				return nil
+			}
+		}
 
 		switch v := sym.Type.(type) {
-		case token.TokenType:
-			switch v {
-			case token.IntType:
-				node.T = types.Typ[types.Int]
-				sym.Type = node.T
-			case token.FloatType:
-				node.T = types.Typ[types.Float]
-				sym.Type = node.T
-			case token.StringType:
-				node.T = types.Typ[types.String]
-				sym.Type = node.T
-			case token.BoolType:
-				node.T = types.Typ[types.Bool]
-				sym.Type = node.T
-			case token.Ident:
+		case *ast.FuncType:
+			signature, err := funcTypeToSignature(v, symbolTable)
+			if err != nil {
+				return err
+			}
+
+			node.T = signature
+			sym.Type = node.T
+		case *ast.BasicType:
+			if v.Token.Type == token.Ident {
 				// TODO: check that if an identifier has another identifier as
-				// type, that it is a struct or function.
-				// identifier must be a struct or func type.
-				s, _ := symbolTable.Resolve(node.Ttoken.Literal)
+				// type, that it is a struct.
+				s, _ := symbolTable.Resolve(v.Token.Literal)
 				node.T = s.Type.(*types.Struct)
+				sym.Type = node.T
+			} else {
+				node.T = tokenToType(v.Token)
 				sym.Type = node.T
 			}
 		case *types.Struct:
@@ -352,7 +343,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			node.T = &types.Struct{Fields: fields}
 			sym.Type = node.T
 		default:
-			return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Ttoken)
+			return fmt.Errorf("type error: identifier: %q has the unknown type: %q", node.Value, node.Tnode)
 		}
 	case *ast.InfixExpression:
 		if err := check(node.Left, symbolTable); err != nil {
@@ -415,6 +406,15 @@ func identifierInStruct(id *ast.Identifier, s *types.Struct) (int, bool) {
 	return 0, false
 }
 
+func typeNodetoType(t ast.TypeNode) types.Type {
+	switch t := t.(type) {
+	case *ast.BasicType:
+		return tokenToType(t.Token)
+	default:
+		panic("other type nodes are not implemented")
+	}
+}
+
 func tokenToType(t token.Token) types.Type {
 	var typ types.Type
 	switch t.Type {
@@ -431,4 +431,47 @@ func tokenToType(t token.Token) types.Type {
 	}
 
 	return typ
+}
+
+func funcTypeToSignature(ft *ast.FuncType, symbolTable *symbol.Table) (*types.Signature, error) {
+	var signature types.Signature
+
+	var parameter types.Type
+	if ft.Parameter != nil {
+		if err := check(ft.Parameter, symbolTable); err != nil {
+			return nil, err
+		}
+
+		parameter = ft.Parameter.T
+	} else {
+		parameter = types.Typ[types.Nil]
+	}
+
+	signature.Parameter = parameter
+
+	var result types.Type
+	switch t := ft.Result.(type) {
+	case *ast.BasicType:
+		if t.Token.Type == token.Ident {
+			sym, _ := symbolTable.Resolve(t.Token.Literal)
+			result = sym.Type.(*types.Struct)
+			break
+		}
+
+		result = typeNodetoType(t)
+	case *ast.FuncType:
+		res, err := funcTypeToSignature(t, symbolTable)
+		if err != nil {
+			return nil, err
+		}
+
+		result = res
+	case *ast.StructType:
+		panic("not implemented")
+	default:
+		result = types.Typ[types.Nil]
+	}
+	signature.Result = result
+
+	return &signature, nil
 }

@@ -77,8 +77,14 @@ func (p *Parser) nextToken() {
 	p.peekToken = p.l.NextToken()
 }
 
-func (p *Parser) curTokenIs(t token.TokenType) bool {
-	return p.curToken.Type == t
+func (p *Parser) curTokenIs(ts ...token.TokenType) bool {
+	for _, t := range ts {
+		if p.curToken.Type == t {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (p *Parser) peekTokenIs(ts ...token.TokenType) bool {
@@ -210,11 +216,20 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
-		return nil
-	}
+	p.nextToken() // advance to type
 
-	id.Ttoken = p.curToken
+	if p.curTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+		id.Tnode = &ast.BasicType{Token: p.curToken}
+	} else if p.curTokenIs(token.Func) {
+		if !p.expectPeek(token.Lparen) {
+			return nil
+		}
+
+		ft := p.parseFuncType()
+		id.Tnode = ft
+	} else {
+		p.errorf("unexpected token: %q", p.curToken)
+	}
 
 	stmt.Name = id
 
@@ -240,8 +255,6 @@ func (p *Parser) parseTypeStatement() *ast.TypeStatement {
 	if !p.expectPeek(token.Struct) {
 		return nil
 	}
-
-	id.Ttoken = p.curToken
 
 	stmt.Name = id
 
@@ -277,7 +290,7 @@ func (p *Parser) parseStructType() ast.TypeNode {
 		return nil
 	}
 
-	id.Ttoken = p.curToken
+	id.Tnode = &ast.BasicType{Token: p.curToken}
 
 	st.Fields = append(st.Fields, id)
 	for p.peekTokenIs(token.Semicolon, token.Ident) {
@@ -296,7 +309,7 @@ func (p *Parser) parseStructType() ast.TypeNode {
 			return nil
 		}
 
-		id.Ttoken = p.curToken
+		id.Tnode = &ast.BasicType{Token: p.curToken}
 
 		st.Fields = append(st.Fields, id)
 	}
@@ -432,28 +445,15 @@ func (p *Parser) parseFuncStatement() *ast.FuncStatement {
 	}
 
 	stmt.Name = &ast.Identifier{
-		Token:  p.curToken,
-		Value:  p.curToken.Literal,
-		Ttoken: stmt.Token,
+		Token: p.curToken,
+		Value: p.curToken.Literal,
 	}
 
 	if !p.expectPeek(token.Lparen) {
 		return nil
 	}
 
-	parameter := p.parseFuncParameter()
-	var result token.Token
-	if p.peekTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
-		p.nextToken() // advance to type
-
-		result = p.curToken
-	}
-
-	stmt.Signature = &ast.FuncType{
-		Token:     stmt.Token,
-		Parameter: parameter,
-		Result:    result,
-	}
+	stmt.Signature = p.parseFuncType()
 
 	if p.peekTokenIs(token.Semicolon) {
 		p.nextToken()
@@ -473,6 +473,24 @@ func (p *Parser) parseFuncStatement() *ast.FuncStatement {
 	return stmt
 }
 
+func (p *Parser) parseFuncType() *ast.FuncType {
+	ft := &ast.FuncType{Token: p.curToken}
+	ft.Parameter = p.parseFuncParameter()
+	if p.peekTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+		p.nextToken() // advance to type
+
+		ft.Result = &ast.BasicType{Token: p.curToken}
+	}
+
+	if p.peekTokenIs(token.Func) {
+		p.nextToken() // func
+		p.nextToken() // "("
+		ft.Result = p.parseFuncType()
+	}
+
+	return ft
+}
+
 func (p *Parser) parseFuncParameter() *ast.Identifier {
 	// Early return if there is no parameter.
 	if p.peekTokenIs(token.Rparen) {
@@ -480,21 +498,40 @@ func (p *Parser) parseFuncParameter() *ast.Identifier {
 		return nil
 	}
 
-	p.nextToken() // The identifier.
+	p.nextToken()
 
-	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	var id ast.Identifier
 
-	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+	if p.curTokenIs(token.Ident) {
+		id.Token = p.curToken
+		id.Value = p.curToken.Literal
+		p.nextToken()
+	} else {
+		// If the function does not give the parameter a name
+		// e.g. "func test(int)" then put in the blank '_' name for it.
+		id.Token = token.Token{
+			Type:    token.Blank,
+			Literal: string(token.Blank),
+		}
+		id.Value = string(token.Blank)
+	}
+
+	if p.curTokenIs(token.Rparen) {
+		id.Tnode = &ast.BasicType{Token: id.Token}
+		return &id
+	}
+
+	if !p.curTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
 		return nil
 	}
 
-	id.Ttoken = p.curToken
+	id.Tnode = &ast.BasicType{Token: p.curToken}
 
 	if !p.expectPeek(token.Rparen) {
 		return nil
 	}
 
-	return id
+	return &id
 }
 
 func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
@@ -651,8 +688,14 @@ func (p *Parser) parseCallExpression(function ast.Expression) ast.Expression {
 	expression := &ast.CallExpression{Token: p.curToken, Function: function}
 	if p.peekTokenIs(token.Rparen) {
 		p.nextToken()
-	} else {
-		expression.Argument = p.parseExpression(Lowest)
+		return expression
+	}
+
+	p.nextToken() // advance to the first argument.
+	expression.Argument = p.parseExpression(Lowest)
+
+	if !p.expectPeek(token.Rparen) {
+		return nil
 	}
 
 	return expression

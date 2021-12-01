@@ -88,6 +88,14 @@ func TestVarStatement(t *testing.T) {
 			},
 			expectedToErr: false,
 		},
+		{
+			input: `var x func(int)`,
+			expectedType: &types.Signature{
+				Parameter: types.Typ[types.Int],
+				Result:    types.Typ[types.Nil],
+			},
+			expectedToErr: false,
+		},
 	}
 
 	runCheckerTests(t, tests)
@@ -111,6 +119,50 @@ x = 2.5`,
 			input: `var x bool
 x = "True"`,
 			expectedType:  types.Typ[types.Int],
+			expectedToErr: true,
+		},
+		{
+			input: `
+			var x func() func(int)
+			func test() func(int)
+			func test2(int)
+
+			func test() func(int) {
+				return test2
+			}
+
+			func test2(x int) {
+				print x
+			}
+
+			x = test
+			`,
+			expectedType: &types.Signature{
+				Parameter: types.Typ[types.Nil],
+				Result: &types.Signature{
+					Parameter: types.Typ[types.Int],
+					Result:    types.Typ[types.Nil],
+				},
+			},
+			expectedToErr: false,
+		},
+		{
+			input: `
+			var x func() func(int)
+			func test(int) func(int)
+			func test2(int)
+
+			func test(x int) func(int) {
+				return test2
+			}
+
+			func test2(x int) {
+				print x
+			}
+
+			x = test // x assigned the wrong type
+			`,
+			expectedType:  nil,
 			expectedToErr: true,
 		},
 	}
@@ -397,10 +449,7 @@ func TestFuncStatement(t *testing.T) {
 			input: `func greeter(x string) string {
 				print x
 			}`,
-			expectedFuncType: &types.Signature{
-				Parameter: types.Typ[types.Nil],
-				Result:    types.Typ[types.Nil],
-			},
+			expectedFuncType:  &types.Signature{},
 			expectedParamType: types.Typ[types.String],
 			expectedToErr:     true,
 		},
@@ -430,6 +479,43 @@ func TestFuncStatement(t *testing.T) {
 			func greeter(x int) string {
 				print x + "Hello"
 			}`,
+			expectedFuncType:  &types.Signature{},
+			expectedParamType: types.Typ[types.Int],
+			expectedToErr:     true,
+		},
+		{
+			input: `
+			func test(int) int
+
+			func test(x int) int {
+				print x
+				if x == 10 {
+					return 1
+				}
+
+				return x
+			}
+			`,
+			expectedFuncType: &types.Signature{
+				Parameter: types.Typ[types.Int],
+				Result:    types.Typ[types.Int],
+			},
+			expectedParamType: types.Typ[types.Int],
+			expectedToErr:     false,
+		},
+		{
+			input: `
+			func test(int) int
+
+			func test(x int) int {
+				print x
+				if x == 10 {
+					return "I WILL FAIL" // returns wrong value!
+				}
+
+				return x
+			}
+			`,
 			expectedFuncType:  &types.Signature{},
 			expectedParamType: types.Typ[types.Int],
 			expectedToErr:     true,
@@ -476,13 +562,14 @@ func TestFuncStatement(t *testing.T) {
 func TestFunctionPrototypes(t *testing.T) {
 	tests := []struct {
 		input             string
+		progIndex         int
 		expectedFuncType  types.Type
 		expectedParamType types.Type
 		expectedToErr     bool
 	}{
 		{
 			input: `
-			func greeter(x string)
+			func greeter(string)
 
 			greeter("hejsa")
 
@@ -495,6 +582,38 @@ func TestFunctionPrototypes(t *testing.T) {
 			},
 			expectedParamType: types.Typ[types.String],
 			expectedToErr:     false,
+		},
+		{
+			input: `
+					type human struct { age int }
+
+					func test(human)
+
+					func test(h human) {
+						print h.age
+					}
+					`,
+			progIndex: 1,
+			expectedFuncType: &types.Signature{
+				Parameter: &types.Struct{
+					Fields: []*types.Field{
+						{
+							Name: "age",
+							Type: types.Typ[types.Int],
+						},
+					},
+				},
+				Result: types.Typ[types.Nil],
+			},
+			expectedParamType: &types.Struct{
+				Fields: []*types.Field{
+					{
+						Name: "age",
+						Type: types.Typ[types.Int],
+					},
+				},
+			},
+			expectedToErr: false,
 		},
 	}
 
@@ -525,7 +644,7 @@ func TestFunctionPrototypes(t *testing.T) {
 			t.Fatalf("checker was assumed to fail, but it did not.")
 		}
 
-		funcStmt, _ := program.Statements[0].(*ast.FuncStatement)
+		funcStmt, _ := program.Statements[tt.progIndex].(*ast.FuncStatement)
 
 		if !reflect.DeepEqual(funcStmt.Name.T, tt.expectedFuncType) {
 			t.Fatalf("funcStmt.Name.T is not %q. got=%q", tt.expectedFuncType.String(), funcStmt.Name.T.String())
@@ -550,7 +669,6 @@ func TestFuncStatementWithStruct(t *testing.T) {
 					type human struct{name string}
 
 					func greeter(x human) human {
-						print x
 						return x
 					}`,
 			expectedFuncType: &types.Signature{
@@ -624,6 +742,7 @@ func TestFuncStatementWithStruct(t *testing.T) {
 func TestCallExpression(t *testing.T) {
 	tests := []struct {
 		input            string
+		progIndex        int
 		expectedCallType types.Type
 	}{
 		{
@@ -632,6 +751,7 @@ func TestCallExpression(t *testing.T) {
 			}
 
 			compile("Hello")`,
+			progIndex:        1,
 			expectedCallType: types.Typ[types.Nil],
 		},
 		{
@@ -640,6 +760,7 @@ func TestCallExpression(t *testing.T) {
 			}
 
 			compile("Hello")`,
+			progIndex:        1,
 			expectedCallType: types.Typ[types.String],
 		},
 		{
@@ -648,7 +769,30 @@ func TestCallExpression(t *testing.T) {
 			}
 
 			compile("Hello Compiler World")`,
+			progIndex:        1,
 			expectedCallType: types.Typ[types.String],
+		},
+		{
+			input: `
+			var x func(int)
+			func test(int)
+
+			x = test
+			x(100)
+			`,
+			progIndex:        3,
+			expectedCallType: types.Typ[types.Nil],
+		},
+		{
+			input: `
+			var x func(int) int
+			func test(int) int
+
+			x = test
+			x(100)
+			`,
+			progIndex:        3,
+			expectedCallType: types.Typ[types.Int],
 		},
 	}
 
@@ -671,7 +815,7 @@ func TestCallExpression(t *testing.T) {
 
 		t.Logf("Program after been checked: %v", program.String())
 
-		exprStmt, _ := program.Statements[1].(*ast.ExpressionStatement)
+		exprStmt, _ := program.Statements[tt.progIndex].(*ast.ExpressionStatement)
 		call, _ := exprStmt.Expression.(*ast.CallExpression)
 
 		if call.T != tt.expectedCallType {
@@ -777,7 +921,7 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 							t.Fatalf("identifier: %q was defined with the wrong type. expected=%s, got=%s", node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
 						}
 					}
-				} else if node.Name.T != tt.expectedType {
+				} else if !reflect.DeepEqual(node.Name.T, tt.expectedType) {
 					t.Fatalf(
 						"variable: %s was defined with the wrong type. expected=%s, got=%s",
 						node.Name.TokenLiteral(), tt.expectedType, node.Name.T)
@@ -811,8 +955,17 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 					t.Fatalf("condition in for statement does not evalutate to a bool")
 				}
 			case *ast.Identifier:
-				if node.T != tt.expectedType {
-					t.Fatalf("identifier has the wrong type. expected=%s, got=%s", tt.expectedType, node.T)
+				t.Logf("%v", node)
+				if !reflect.DeepEqual(node.T, tt.expectedType) {
+					// The
+					if node.T.Kind() == types.Func {
+						if !reflect.DeepEqual(node.T, tt.expectedType.(*types.Signature).Result) {
+							t.Fatalf("identifier: %q has the wrong type. expected=%s, got=%s", node.Value, tt.expectedType.(*types.Signature).Result, node.T)
+						}
+
+						break
+					}
+					t.Fatalf("identifier: %q has the wrong type. expected=%s, got=%s", node.Value, tt.expectedType, node.T)
 				}
 			case *ast.InfixExpression:
 				if node.T != tt.expectedType {

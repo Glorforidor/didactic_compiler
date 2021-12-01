@@ -91,6 +91,7 @@ func TestVarStatement(t *testing.T) {
 		{`var x string = "Hello World"`, "x", "string", "Hello World"},
 		{"var x bool = true", "x", "bool", true},
 		{"var x bool = false", "x", "bool", false},
+		{"var x func(y int)", "x", "(", nil},
 	}
 
 	for _, tt := range tests {
@@ -123,8 +124,8 @@ func testVarStatement(t *testing.T, stmt ast.Statement, id string, varType strin
 		t.Fatalf("varStmt.Name.Value not %q, got=%q", id, varStmt.Name.Value)
 	}
 
-	if varStmt.Name.Ttoken.Literal != varType {
-		t.Fatalf("varStmt.Name.Ttoken is not %s, got=%s", varType, varStmt.Name.Ttoken.Literal)
+	if varStmt.Name.Tnode.TokenLiteral() != varType {
+		t.Fatalf("varStmt.Name.Tnode is not %s, got=%s", varType, varStmt.Name.Tnode.TokenLiteral())
 	}
 
 	if value != nil {
@@ -210,8 +211,11 @@ func TestTypeStatement(t *testing.T) {
 				t.Fatalf("structType.Fields contains %q which was not expected", f.Value)
 			}
 
-			if ft != f.Ttoken.Type {
-				t.Fatalf("structType.Fields.List[%d].Kind is not %s. got=%s", i, ft, f.Ttoken.Type)
+			switch v := f.Tnode.(type) {
+			case *ast.BasicType:
+				if ft != v.Token.Type {
+					t.Fatalf("structType.Fields.List[%d].Kind is not %s. got=%s", i, ft, v.Token.Type)
+				}
 			}
 		}
 	}
@@ -535,21 +539,28 @@ func TestFuncStatement(t *testing.T) {
 		expectedName       string
 		expectedParamValue string
 		expectedParamType  string
-		expectedResult     string
+		expectedResult     interface{}
 	}{
+		{
+			input:              `func greet(int)`,
+			expectedName:       "greet",
+			expectedParamValue: "_",
+			expectedParamType:  "int",
+			expectedResult:     nil,
+		},
 		{
 			input:              `func greet() {}`,
 			expectedName:       "greet",
 			expectedParamValue: "",
 			expectedParamType:  "",
-			expectedResult:     "",
+			expectedResult:     nil,
 		},
 		{
 			input:              `func greet(s string) { }`,
 			expectedName:       "greet",
 			expectedParamValue: "s",
 			expectedParamType:  "string",
-			expectedResult:     "",
+			expectedResult:     nil,
 		},
 		{
 			input:              `func greet(s string) int { }`,
@@ -588,7 +599,8 @@ func TestFuncStatement(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
+		t.Logf("test[%d]", i)
 		l := lexer.New(tt.input)
 		p := New(l)
 		program := p.ParseProgram()
@@ -618,20 +630,32 @@ func TestFuncStatement(t *testing.T) {
 				)
 			}
 
-			if funcStmt.Signature.Parameter.Ttoken.Literal != tt.expectedParamType {
+			if funcStmt.Signature.Parameter.Tnode.TokenLiteral() != tt.expectedParamType {
 				t.Fatalf(
 					"funcStmt.Parameter.Ttoken.Literal is not %q, got=%q",
 					tt.expectedParamType,
-					funcStmt.Signature.Parameter.Ttoken.Literal,
+					funcStmt.Signature.Parameter.Tnode.TokenLiteral(),
 				)
 			}
 		}
 
-		if funcStmt.Signature.Result.Literal != tt.expectedResult {
+		if funcStmt.Signature.Result == nil {
+			if tt.expectedResult == nil {
+				continue
+			}
+
 			t.Fatalf(
 				"funcStmt.Result is not %q, got=%q",
 				tt.expectedResult,
-				funcStmt.Signature.Result.Literal,
+				funcStmt.Signature.Result,
+			)
+		}
+
+		if funcStmt.Signature.Result.TokenLiteral() != tt.expectedResult {
+			t.Fatalf(
+				"funcStmt.Result is not %q, got=%q",
+				tt.expectedResult,
+				funcStmt.Signature.Result.TokenLiteral(),
 			)
 		}
 	}

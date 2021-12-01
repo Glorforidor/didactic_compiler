@@ -287,9 +287,9 @@ func (rs *ReturnStatement) String() string {
 }
 
 type Identifier struct {
-	Token  token.Token // The token.Ident token.
-	Value  string      // e.g. foo, bar, foobar
-	Ttoken token.Token // Type token: token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident
+	Token token.Token // The token.Ident token.
+	Value string      // e.g. foo, bar, foobar
+	Tnode TypeNode
 
 	Reg string
 	T   types.Type
@@ -392,10 +392,18 @@ func (ie *InfixExpression) String() string {
 	return sb.String()
 }
 
+type BasicType struct {
+	Token token.Token
+}
+
+func (bt *BasicType) typeNode()            {}
+func (bt *BasicType) TokenLiteral() string { return bt.Token.Literal }
+func (bt *BasicType) String() string       { return bt.Token.Literal }
+
 type FuncType struct {
-	Token     token.Token // The token.Func token.
+	Token     token.Token // The token.Lparen token.
 	Parameter *Identifier
-	Result    token.Token // Type token: token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident
+	Result    TypeNode
 }
 
 func (ft *FuncType) typeNode()            {}
@@ -410,8 +418,8 @@ func (ft *FuncType) String() string {
 
 	sb.WriteString(")")
 	sb.WriteString(" ")
-	if ft.Result.Literal != "" {
-		sb.WriteString(ft.Result.Literal)
+	if ft.Result != nil {
+		sb.WriteString(ft.Result.TokenLiteral())
 		sb.WriteString(" ")
 	}
 

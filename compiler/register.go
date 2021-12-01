@@ -20,6 +20,8 @@ func riscvTable() *registerTable {
 			"t5": false,
 			"t6": false,
 		},
+		// s0 or also fp is the frame pointer register and therefore not
+		// includeded if it was to be used later on.
 		generalSaved: map[string]bool{
 			"s1":  false,
 			"s2":  false,
@@ -50,6 +52,7 @@ func riscvTable() *registerTable {
 	}
 }
 
+// allocGeneralSaved allocates the general purpose saved registers.
 func (rt *registerTable) allocGeneralSaved() (string, error) {
 	var generalSaveds []string
 	for k := range rt.generalSaved {
@@ -67,6 +70,7 @@ func (rt *registerTable) allocGeneralSaved() (string, error) {
 	return "", fmt.Errorf("no more general register available: %v", rt.general)
 }
 
+// allocGeneral allocates the general purpose temporary registers.
 func (rt *registerTable) allocGeneral() (string, error) {
 	var generals []string
 	for k := range rt.general {

@@ -9,9 +9,10 @@ type SymbolScope int
 
 const (
 	GlobalScope SymbolScope = iota
-	LocalScope
-	TypeScope
 	FuncScope
+	LocalScope
+
+	TypeScope
 )
 
 func (ss SymbolScope) String() string {
@@ -38,9 +39,9 @@ const variableSize = 8
 func (s *Symbol) Code() interface{} {
 	// Code returns the assembly code for the symbol.
 	switch s.Scope {
-	case GlobalScope:
-		// In the global scope it is always just the name of the symbol as it
-		// refers to a label.
+	case GlobalScope, FuncScope:
+		// In the global scope (or the function scope) it is always just the
+		// name of the symbol as it refers to a label.
 		return s.Name
 	case LocalScope:
 		return s.stackOffset + s.stackPoint
@@ -136,9 +137,9 @@ func (st *Table) Define(name string, t interface{}) (*Symbol, error) {
 	return s, nil
 }
 
-// ComputeStack how much stack space each block will accomendate and also sets
-// the symbols stack offset.
-func (st *Table) ComputeStack() {
+// ComputeStack computes how much stack space a block will accomendate and save
+// the computation in the symbol table. It returns the computed stack space.
+func (st *Table) ComputeStack() int {
 	keys := make([]string, 0, len(st.store))
 	for k := range st.store {
 		keys = append(keys, k)
@@ -168,6 +169,8 @@ func (st *Table) ComputeStack() {
 	} else {
 		st.stackSpace = x
 	}
+
+	return st.stackSpace
 }
 
 func (st *Table) Resolve(name string) (*Symbol, bool) {
@@ -177,7 +180,7 @@ func (st *Table) Resolve(name string) (*Symbol, bool) {
 func (st *Table) resolve(name string, stackOffset int) (*Symbol, bool) {
 	s, ok := st.store[name]
 	if !ok && st.Outer != nil {
-		s, ok := st.Outer.resolve(name, stackOffset+st.StackSpace())
+		s, ok := st.Outer.resolve(name, stackOffset+st.stackSpace)
 		return s, ok
 	}
 
@@ -186,8 +189,4 @@ func (st *Table) resolve(name string, stackOffset int) (*Symbol, bool) {
 		s.stackOffset = stackOffset
 	}
 	return s, ok
-}
-
-func (st *Table) StackSpace() int {
-	return st.stackSpace
 }

@@ -36,9 +36,11 @@ type Compiler struct {
 	registerTable *registerTable
 	label         label
 
-	// funcCleanUpStack signalise that functions epilogue is going to clean up
-	// the stack space for all blocks within in the function.
-	funcCleanUpStack bool
+	// inFunc is set when compiling FuncStatements, which will make the emit
+	// function to append instructions to fun instead of code. Furthermore,
+	// also instruct global identifiers loaded inside a function to use the
+	// temporary register instead of saved register.
+	inFunc bool
 
 	// stackSpace grow each time a block allocated stack space and shrink when
 	// block deallocates.
@@ -67,31 +69,22 @@ func (c *Compiler) Compile(node ast.Node) error {
 	switch node := node.(type) {
 	case *ast.Program:
 		c.symbolTable = node.SymbolTable
-		c.symbolTable.ComputeStack()
+		// c.symbolTable.ComputeStack()
 		for _, s := range node.Statements {
 			if err := c.Compile(s); err != nil {
 				return err
 			}
 		}
 	case *ast.BlockStatement:
-		c.symbolTable = node.SymbolTable
-		c.symbolTable.ComputeStack()
-		s := c.symbolTable.StackSpace()
-		c.stackSpace += s
-		c.emitf("addi sp, sp, -%d", s)
+		defer c.leaveScope(c.enterScope(node.SymbolTable))
+		defer c.stackDealloc(c.stackAlloc())
+
 		for _, s := range node.Statements {
 			if err := c.Compile(s); err != nil {
 				return err
 			}
 		}
 
-		// let the *ast.FuncStatement clean up the stack.
-		if !c.funcCleanUpStack {
-			c.stackSpace -= s
-			c.emitf("addi sp, sp, %d", s)
-		}
-
-		c.symbolTable = node.SymbolTable.Outer
 	case *ast.ExpressionStatement:
 		if err := c.Compile(node.Expression); err != nil {
 			return err
@@ -121,7 +114,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.print(printType, reg)
 
-		c.registerTable.dealloc(node.Value.Register())
+		c.registerTable.dealloc(reg)
 	case *ast.VarStatement:
 		s, _ := c.symbolTable.Resolve(node.Name.Value)
 
@@ -247,14 +240,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.emitf("%s:", doneLabel)
 	case *ast.ForStatement:
-		c.symbolTable = node.SymbolTable
-		c.symbolTable.ComputeStack()
-
-		s := c.symbolTable.StackSpace()
-
-		c.stackSpace += s
-
-		c.emitf("addi sp, sp, -%d", s)
+		defer c.leaveScope(c.enterScope(node.SymbolTable))
+		defer c.stackDealloc(c.stackAlloc())
 
 		if err := c.Compile(node.Init); err != nil {
 			return err
@@ -284,27 +271,22 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.emitf("b %s", topLabel)
 		c.emitf("%s:", doneLabel)
-
-		if !c.funcCleanUpStack {
-			c.stackSpace -= s
-			c.emitf("addi sp, sp, %d", s)
-		}
-		c.symbolTable = node.SymbolTable.Outer
 	case *ast.TypeStatement:
 		// type statements is only needed for the semantic analysis.
 	case *ast.FuncStatement:
-		c.funcCleanUpStack = true
-		defer func() { c.funcCleanUpStack = false }()
+		c.inFunc = true
+		defer func() { c.inFunc = false }()
 		// If there is no body then the node is forward declaration of a
 		// function. Therefore, no need to generate code.
 		if node.Body == nil {
 			break
 		}
 
-		c.symbolTable = node.SymbolTable
-		c.symbolTable.ComputeStack()
+		defer c.leaveScope(c.enterScope(node.SymbolTable))
 
-		space := c.symbolTable.StackSpace()
+		space := c.symbolTable.ComputeStack()
+
+		// space := c.symbolTable.StackSpace()
 		c.emitf("%s:", node.Name.Value)
 
 		if node.Signature.Parameter != nil {
@@ -330,16 +312,21 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		// Epilogue of the function
 		c.emitf("%s.epilogue:", node.Name.Value)
-
-		c.emitf("addi sp, sp, %d", c.stackSpace)
-
 		c.emitf("ld ra, %d(sp)", space)
 		c.emitf("addi sp, sp, %d", space)
 		c.emitf("ret")
 
 		c.stackSpace = 0
-		c.symbolTable = c.symbolTable.Outer
+		// c.symbolTable = c.symbolTable.Outer
 	case *ast.ReturnStatement:
+		if node.Value == nil {
+			// Clean up any stack space before jumping.
+			c.emitf("addi sp, sp, %d", c.stackSpace)
+			// Unconditionally jump to the functions epilogue.
+			c.emitf("j %s.epilogue", node.Function.Value)
+			return nil
+		}
+
 		if err := c.Compile(node.Value); err != nil {
 			return err
 		}
@@ -352,6 +339,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emitf("mv a0, %s", node.Value.Register())
 		}
 
+		// Clean up any stack space before jumping.
+		c.emitf("addi sp, sp, %d", c.stackSpace)
 		// Unconditionally jump to the functions epilogue.
 		c.emitf("j %s.epilogue", node.Function.Value)
 
@@ -366,28 +355,58 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 		}
 
-		if node.Argument == nil {
-			c.emitf("call %s", node.Function.TokenLiteral())
-			return nil
+		id, ok := node.Function.(*ast.Identifier)
+		if !ok {
+			// TODO: This would be nice if one could create a call chain.
+			// Although this is a future work thing!
+			panic("calling a non identifier is not supported")
 		}
 
-		if err := c.Compile(node.Argument); err != nil {
-			return err
+		if node.Argument != nil {
+			if err := c.Compile(node.Argument); err != nil {
+				return err
+			}
+			c.registerTable.dealloc(node.Argument.Register())
+
+			// We need to load the value from a global variable otherwise we would
+			// pass along the address of the variable in the data segment and not
+			// the value it points to.
+			c.loadGlobalOrPtrValue(node.Argument)
+
+			switch node.Argument.Type().Kind() {
+			case types.Float:
+				c.emitf("fmv.d fa0, %s", node.Argument.Register())
+			default:
+				c.emitf("mv a0, %s", node.Argument.Register())
+			}
 		}
 
-		// We need to load the value from a global variable otherwise we would
-		// pass along the address of the variable in the data segment and not
-		// the value it points to.
-		c.loadGlobalOrPtrValue(node.Argument)
+		s, _ := c.symbolTable.Resolve(id.Value)
+		switch s.Scope {
+		case symbol.FuncScope:
+			c.emitf("call %s", s.Name)
+		case symbol.GlobalScope:
+			reg, err := c.registerTable.allocGeneral()
+			if err != nil {
+				return err
+			}
 
-		switch node.Argument.Type().Kind() {
-		case types.Float:
-			c.emitf("fmv.d fa0, %s", node.Argument.Register())
-		default:
-			c.emitf("mv a0, %s", node.Argument.Register())
+			c.emitf("la %s, %s", reg, s.Code())
+			c.emitf("ld %s, 0(%s)", reg, reg)
+			c.emitf("jalr %s", reg)
+
+			c.registerTable.dealloc(reg)
+		case symbol.LocalScope:
+			reg, err := c.registerTable.allocGeneral()
+			if err != nil {
+				return err
+			}
+
+			c.emitf("ld %s, %d(sp)", reg, s.Code().(int))
+			c.emitf("jalr %s", reg)
+
+			c.registerTable.dealloc(reg)
 		}
-
-		c.emitf("call %s", node.Function.TokenLiteral())
 	case *ast.Identifier:
 		reg, err := c.loadSymbol(node)
 		if err != nil {
@@ -508,14 +527,14 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emitf("li %s, 0", reg)
 		}
 	default:
-		return fmt.Errorf("unknown type: %#v", node)
+		return fmt.Errorf("compiler error: unknown type: %#v", node)
 	}
 
 	return nil
 }
 
 func (c *Compiler) emitf(format string, a ...interface{}) {
-	if c.funcCleanUpStack {
+	if c.inFunc {
 		c.fun = append(c.fun, fmt.Sprintf(format, a...))
 	} else {
 		c.code = append(c.code, fmt.Sprintf(format, a...))
@@ -531,14 +550,26 @@ func (c *Compiler) addConstant(data ...string) {
 
 func (c *Compiler) loadSymbol(node *ast.Identifier) (string, error) {
 	s, _ := c.symbolTable.Resolve(node.Value)
-
 	switch s.Scope {
-	case symbol.GlobalScope:
+	case symbol.GlobalScope, symbol.FuncScope:
+		// Loading a global or function identifier insde a function should not
+		// use the s{1..11} registers and instead allocate general registers
+		// t{0..7}. We use the s{1..11} when operating on identifiers in the
+		// global scope.
+		if c.inFunc {
+			reg, err := c.registerTable.allocGeneral()
+			if err != nil {
+				return "", err
+			}
+
+			c.emitf("la %s, %s", reg, s.Code())
+			return reg, nil
+		}
+
 		reg, err := c.registerTable.allocGeneralSaved()
 		if err != nil {
 			return "", err
 		}
-
 		c.emitf("la %s, %s", reg, s.Code())
 
 		return reg, nil
@@ -568,6 +599,8 @@ func loadASM(t types.Type) (string, error) {
 	case types.Float:
 		return "fld %s, %d(sp)", nil
 	case types.StructKind:
+		return "ld %s, %d(sp)", nil
+	case types.Func:
 		return "ld %s, %d(sp)", nil
 	default:
 		return "", fmt.Errorf("compile error: loading value of type: %s is not supported", t)
@@ -725,7 +758,7 @@ func (c *Compiler) createASMLabelIdentifier(name string, t types.Type) error {
 	// TODO: This method could easily just emit the code instead of returning
 	// the string.
 	switch t.Kind() {
-	case types.Int, types.String, types.Bool:
+	case types.Int, types.String, types.Bool, types.Func:
 		// string identifiers are treated as memory address of the actual
 		// string.
 		c.addConstantf("%s: .dword 0", name)
@@ -777,6 +810,28 @@ func (c *Compiler) print(printType int, reg string) {
 		c.emitf("li a7, %d", printType)
 		c.emitf("ecall")
 	}
+}
+
+func (c *Compiler) enterScope(symbol *symbol.Table) *symbol.Table {
+	c.symbolTable = symbol
+	return symbol
+}
+
+func (c *Compiler) leaveScope(symbol *symbol.Table) {
+	c.symbolTable = symbol.Outer
+}
+
+func (c *Compiler) stackAlloc() int {
+	s := c.symbolTable.ComputeStack()
+	c.stackSpace += s
+	c.emitf("addi sp, sp, -%d", s)
+
+	return s
+}
+
+func (c *Compiler) stackDealloc(s int) {
+	c.stackSpace -= s
+	c.emitf("addi sp, sp, %d", s)
 }
 
 func (c *Compiler) heapAllocate(size int) {

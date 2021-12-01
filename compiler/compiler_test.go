@@ -12,12 +12,17 @@ import (
 	"github.com/Glorforidor/didactic_compiler/symbol"
 )
 
-func parse(input string) *ast.Program {
+func parse(t *testing.T, input string) *ast.Program {
 	l := lexer.New(input)
 	p := parser.New(l)
 	program := p.ParseProgram()
-	resolver.Resolve(program, symbol.NewTable())
-	checker.Check(program)
+	if err := resolver.Resolve(program, symbol.NewTable()); err != nil {
+		t.Fatalf("Resolver failed: %v", err)
+	}
+
+	if err := checker.Check(program); err != nil {
+		t.Fatalf("Type checker failed: %v", err)
+	}
 	return program
 }
 
@@ -262,6 +267,20 @@ func TestVarStatement(t *testing.T) {
 			.text`,
 		},
 		{
+			input: "var x float",
+			expected: `
+			.data
+			x: .double 0
+			.text`,
+		},
+		{
+			input: "var x bool",
+			expected: `
+			.data
+			x: .dword 0
+			.text`,
+		},
+		{
 			input: "var x string",
 			expected: `
 			.data
@@ -269,10 +288,10 @@ func TestVarStatement(t *testing.T) {
 			.text`,
 		},
 		{
-			input: "var x float",
+			input: "var x func() int",
 			expected: `
 			.data
-			x: .double 0
+			x: .dword 0
 			.text`,
 		},
 		{
@@ -330,6 +349,39 @@ func TestVarStatement(t *testing.T) {
 			sd a0, 0(t0)
 			`,
 		},
+		{
+			input: `
+			func incrementer(x int) int {
+				return x + 1
+			}
+
+			var x func(int) int
+			x = incrementer
+			`,
+			expected: `
+			.data
+			x: .dword 0
+			.text
+			la s1, x
+			la s10, incrementer
+			sd s10, 0(s1)
+			incrementer:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			li t1, 1
+			add t0, t0, t1
+			mv a0, t0
+			addi sp, sp, 0
+			j incrementer.epilogue
+			addi sp, sp, 0
+			incrementer.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret`,
+		},
 	}
 
 	runCompilerTests(t, tests)
@@ -363,6 +415,20 @@ func TestAssignStatement(t *testing.T) {
 			la s1, x
 			fld ft0, .L1, t0
 			fsd ft0, 0(s1)`,
+		},
+		{
+			input: `
+			var x bool
+			x = true
+			`,
+			expected: `
+			.data
+			x: .dword 0
+			.text
+			la s1, x
+			li t0, 1
+			sd t0, 0(s1)
+			`,
 		},
 		{
 			input: `
@@ -757,8 +823,8 @@ func TestFuncStatement(t *testing.T) {
 			mv a0, t0
 			li a7, 1
 			ecall
-			greeter.epilogue:
 			addi sp, sp, 0
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -780,8 +846,8 @@ func TestFuncStatement(t *testing.T) {
 			mv a0, t0
 			li a7, 1
 			ecall
-			greeter.epilogue:
 			addi sp, sp, 0
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -803,8 +869,8 @@ func TestFuncStatement(t *testing.T) {
 			mv a0, t0
 			li a7, 4
 			ecall
-			greeter.epilogue:
 			addi sp, sp, 0
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -824,9 +890,10 @@ func TestFuncStatement(t *testing.T) {
 			addi sp, sp, -0
 			ld t0, 8(sp)
 			mv a0, t0
-			j greeter.epilogue
-			greeter.epilogue:
 			addi sp, sp, 0
+			j greeter.epilogue
+			addi sp, sp, 0
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -852,9 +919,10 @@ func TestFuncStatement(t *testing.T) {
 			sd a0, 8(sp)
 			ld t0, 8(sp)
 			mv a0, t0
-			j greeter.epilogue
-			greeter.epilogue:
 			addi sp, sp, 16
+			j greeter.epilogue
+			addi sp, sp, 16
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -877,13 +945,99 @@ func TestFuncStatement(t *testing.T) {
 			ld t0, 8(sp)
 			ld t0, 8(t0)
 			mv a0, t0
-			j greeter.epilogue
-			greeter.epilogue:
 			addi sp, sp, 0
+			j greeter.epilogue
+			addi sp, sp, 0
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
 			`,
+		},
+		{
+			input: `
+			func incrementer(x int) int {
+				return x + 1
+			}
+
+			func decrementer(x int) int {
+				return x - 1
+			}
+
+			func getFunc(x int) func(int) int {
+				if x == 1 {
+					return incrementer
+				}
+				return decrementer
+			}
+			`,
+			expected: `
+			.data
+			.text
+			incrementer:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			li t1, 1
+			add t0, t0, t1
+			mv a0, t0
+			addi sp, sp, 0
+			j incrementer.epilogue
+			addi sp, sp, 0
+			incrementer.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			decrementer:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			li t1, 1
+			sub t0, t0, t1
+			mv a0, t0
+			addi sp, sp, 0
+			j decrementer.epilogue
+			addi sp, sp, 0
+			decrementer.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			getFunc:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			li t1, 1
+			beq t0, t1, .L1
+			li t0, 0
+			b .L2
+			.L1:
+			li t0, 1
+			.L2:
+			beqz t0, .L3
+			addi sp, sp, -0
+			la t0, incrementer
+			mv a0, t0
+			addi sp, sp, 0
+			j getFunc.epilogue
+			addi sp, sp, 0
+			b .L4
+			.L3:
+			.L4:
+			la t0, decrementer
+			mv a0, t0
+			addi sp, sp, 0
+			j getFunc.epilogue
+			addi sp, sp, 0
+			getFunc.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret`,
 		},
 	}
 
@@ -915,8 +1069,8 @@ func TestCallExpression(t *testing.T) {
 			mv a0, t0
 			li a7, 4
 			ecall
-			greeter.epilogue:
 			addi sp, sp, 0
+			greeter.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -966,8 +1120,107 @@ func TestCallExpression(t *testing.T) {
 			mv a0, t0
 			li a7, 1
 			ecall
-			greeter.epilogue:
 			addi sp, sp, 0
+			greeter.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			`,
+		},
+		{
+			input: `
+			func incrementer(x int) int {
+				return x + 1
+			}
+
+			var x func(int) int
+			x = incrementer
+			`,
+			expected: `
+			.data
+			x: .dword 0
+			.text
+			la s1, x
+			la s10, incrementer
+			sd s10, 0(s1)
+			incrementer:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			li t1, 1
+			add t0, t0, t1
+			mv a0, t0
+			addi sp, sp, 0
+			j incrementer.epilogue
+			addi sp, sp, 0
+			incrementer.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret`,
+		},
+		{
+			input: `
+			var x func() func(int)
+			var y func(int)
+			func test() func(int)
+			func test2(int)
+
+			func test() func(int) {
+				return test2
+			}
+
+			func test2(x int) {
+				print x
+			}
+
+			x = test
+			y = x()
+			y(10)
+			`,
+			expected: `
+			.data
+			x: .dword 0
+			y: .dword 0
+			.text
+			la s1, x
+			la s10, test
+			sd s10, 0(s1)
+			la s1, y
+			la t0, x
+			ld t0, 0(t0)
+			jalr t0
+			sd a0, 0(s1)
+			li t0, 10
+			mv a0, t0
+			la t0, y
+			ld t0, 0(t0)
+			jalr t0
+			test:
+			addi sp, sp, -16
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			la t0, test2
+			mv a0, t0
+			addi sp, sp, 0
+			j test.epilogue
+			addi sp, sp, 0
+			test.epilogue:
+			ld ra, 16(sp)
+			addi sp, sp, 16
+			ret
+			test2:
+			addi sp, sp, -16
+			sd a0, 8(sp)
+			sd ra, 16(sp)
+			addi sp, sp, -0
+			ld t0, 8(sp)
+			mv a0, t0
+			li a7, 1
+			ecall
+			addi sp, sp, 0
+			test2.epilogue:
 			ld ra, 16(sp)
 			addi sp, sp, 16
 			ret
@@ -985,7 +1238,7 @@ func runCompilerTests(t *testing.T, tests []compilerTest) {
 	replacer := strings.NewReplacer("\t", "", "\n", "")
 
 	for _, tt := range tests {
-		program := parse(tt.input)
+		program := parse(t, tt.input)
 
 		comp := newTest()
 

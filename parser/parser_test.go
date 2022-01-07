@@ -334,7 +334,7 @@ func TestBlockStatement(t *testing.T) {
 		expectedSize int
 	}{
 		{
-			input:        "{var x int = 2;}",
+			input:        "{var x int = 2}",
 			expectedSize: 1,
 		},
 		{

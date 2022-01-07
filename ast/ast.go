@@ -30,7 +30,7 @@ type Statement interface {
 type Expression interface {
 	Node
 
-	// Register returns a register number.
+	// Register returns a register name.
 	Register() string
 
 	// Type returns the expressions type.

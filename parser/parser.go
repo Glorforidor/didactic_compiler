@@ -162,7 +162,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parsePrintStatement()
 	case token.Var:
 		v := p.parseVarStatement()
-		if !p.expectPeek(token.Semicolon) {
+		if !p.expectSemi() {
 			return nil
 		}
 
@@ -171,7 +171,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseTypeStatement()
 	case token.Lbrace:
 		block := p.parseBlockStatement()
-		if !p.expectPeek(token.Semicolon) {
+		if !p.expectSemi() {
 			return nil
 		}
 		return block
@@ -200,7 +200,7 @@ func (p *Parser) parsePrintStatement() *ast.PrintStatement {
 
 	stmt.Value = p.parseExpression(Lowest)
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -229,6 +229,7 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 		id.Tnode = ft
 	} else {
 		p.errorf("unexpected token: %q", p.curToken)
+		return nil
 	}
 
 	stmt.Name = id
@@ -260,7 +261,7 @@ func (p *Parser) parseTypeStatement() *ast.TypeStatement {
 
 	stmt.Type = p.parseStructType()
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -380,7 +381,7 @@ func (p *Parser) parseIfStatement() *ast.IfStatement {
 		stmt.Alternative = p.parseBlockStatement()
 	}
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -402,7 +403,7 @@ func (p *Parser) parseForStatement() *ast.ForStatement {
 		return nil
 	}
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -410,7 +411,7 @@ func (p *Parser) parseForStatement() *ast.ForStatement {
 
 	stmt.Condition = p.parseExpression(Lowest)
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -430,7 +431,7 @@ func (p *Parser) parseForStatement() *ast.ForStatement {
 
 	stmt.Body = p.parseBlockStatement()
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -466,7 +467,7 @@ func (p *Parser) parseFuncStatement() *ast.FuncStatement {
 
 	stmt.Body = p.parseBlockStatement()
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -506,9 +507,21 @@ func (p *Parser) parseFuncParameter() *ast.Identifier {
 		id.Token = p.curToken
 		id.Value = p.curToken.Literal
 		p.nextToken()
+
+		// leave early in case where the function protoype is:
+		// type human struct {}
+		// func testHuman(human)
+		//					^
+		//					|
+		//				identifier without
+		//				type as the identifier is a struct type.
+		if p.curTokenIs(token.Rparen) {
+			id.Tnode = &ast.BasicType{Token: id.Token}
+			return &id
+		}
 	} else {
-		// If the function does not give the parameter a name
-		// e.g. "func test(int)" then put in the blank '_' name for it.
+		// If the function prototype does not give the parameter a name e.g.
+		// "func test(int)" then put in the blank '_' name for it.
 		id.Token = token.Token{
 			Type:    token.Blank,
 			Literal: string(token.Blank),
@@ -516,16 +529,14 @@ func (p *Parser) parseFuncParameter() *ast.Identifier {
 		id.Value = string(token.Blank)
 	}
 
-	if p.curTokenIs(token.Rparen) {
-		id.Tnode = &ast.BasicType{Token: id.Token}
-		return &id
-	}
-
-	if !p.curTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+	if p.curTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
+		id.Tnode = &ast.BasicType{Token: p.curToken}
+	} else if p.curTokenIs(token.Func) {
+		p.nextToken() // advance to '('
+		id.Tnode = p.parseFuncType()
+	} else {
 		return nil
 	}
-
-	id.Tnode = &ast.BasicType{Token: p.curToken}
 
 	if !p.expectPeek(token.Rparen) {
 		return nil
@@ -545,7 +556,7 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 
 	stmt.Value = p.parseExpression(Lowest)
 
-	if !p.expectPeek(token.Semicolon) {
+	if !p.expectSemi() {
 		return nil
 	}
 
@@ -623,7 +634,7 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	return leftExp
 }
 
-// Precendence table
+// Precedence table
 const (
 	_ int = iota
 	Lowest

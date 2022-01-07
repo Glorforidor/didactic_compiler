@@ -72,7 +72,8 @@ func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
 	switch l.ch {
 	case newline:
-		// if we reach here, if l.insertSemi was true
+		// We reach here, if l.insertSemi was true so l.skipWhiteSpace did not
+		// skip the newline.
 		l.insertSemi = false
 		tok = newToken(token.Semicolon, l.ch)
 	case '+':

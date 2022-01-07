@@ -16,8 +16,6 @@ func Check(program *ast.Program) error {
 	return check(program, program.SymbolTable)
 }
 
-const wordAllignment = 8
-
 var currentFunc *ast.Identifier
 
 func check(node ast.Node, symbolTable *symbol.Table) error {
@@ -56,7 +54,6 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 		}
 
 		if !reflect.DeepEqual(node.Name.T, node.Value.Type()) {
-			// if node.Name.T != node.Value.Type() {
 			return fmt.Errorf(
 				"type error: identifier: %q of type: %s is assigned the wrong type: %s",
 				node.Name.Value,
@@ -80,7 +77,6 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 				if t.Token.Type == token.Ident {
 					return fmt.Errorf("type error: struct fields can only be a basic type [int, float, bool, string].")
 				}
-
 				f.T = typeNodetoType(t)
 			default:
 				// TODO: maybe later allow for struct inside structs.
@@ -128,7 +124,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			}
 			node.Offset = offset
 		default:
-			return fmt.Errorf("type error: select X is not an Identifier. got=%T", v)
+			return fmt.Errorf("type error: can not handle the expression for X in selection. got=%T", v)
 		}
 
 		node.T = node.Field.T
@@ -313,20 +309,30 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			sym.Type = node.T
 		case *ast.BasicType:
 			if v.Token.Type == token.Ident {
-				// TODO: check that if an identifier has another identifier as
-				// type, that it is a struct.
-				s, _ := symbolTable.Resolve(v.Token.Literal)
+				s, ok := symbolTable.Resolve(v.Token.Literal)
+				if !ok {
+					return fmt.Errorf(
+						"checker error: identifier %q is not defined",
+						v.Token.Literal,
+					)
+				}
+				if s.Scope != symbol.TypeScope {
+					return fmt.Errorf(
+						"checker error: identifier %q is not a type",
+						v.Token.Literal,
+					)
+				}
 				node.T = s.Type.(*types.Struct)
 				sym.Type = node.T
 			} else {
 				node.T = tokenToType(v.Token)
 				sym.Type = node.T
 			}
-		case *types.Struct:
-			node.T = v
 		case *types.Basic:
 			node.T = v
 		case *types.Signature:
+			node.T = v
+		case *types.Struct:
 			node.T = v
 		case *ast.StructType:
 			if err := check(v, symbolTable); err != nil {
@@ -396,6 +402,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 // updates that identifier with the same type as the one in the struct and
 // returns true. Otherwise returns false.
 func identifierInStruct(id *ast.Identifier, s *types.Struct) (int, bool) {
+	const wordAllignment = 8
 	for i, f := range s.Fields {
 		if f.Name == id.Value {
 			id.T = f.Type
@@ -454,6 +461,9 @@ func funcTypeToSignature(ft *ast.FuncType, symbolTable *symbol.Table) (*types.Si
 	case *ast.BasicType:
 		if t.Token.Type == token.Ident {
 			sym, _ := symbolTable.Resolve(t.Token.Literal)
+			if sym.Scope != symbol.TypeScope {
+				return nil, fmt.Errorf("checker error: identifier %q is not a type", t.Token.Literal)
+			}
 			result = sym.Type.(*types.Struct)
 			break
 		}

@@ -14,8 +14,6 @@ const (
 	cFalse = 0
 )
 
-const wordAllignment = 8
-
 // NOTE: the reason code and fun are splittet is to generate all function
 // instructions in the buttom of the outputed assembly file. This will ensure
 // that function is not outputted before a function is called since a assembly
@@ -68,8 +66,7 @@ func newTest() *Compiler {
 func (c *Compiler) Compile(node ast.Node) error {
 	switch node := node.(type) {
 	case *ast.Program:
-		c.symbolTable = node.SymbolTable
-		// c.symbolTable.ComputeStack()
+		c.enterScope(node.SymbolTable)
 		for _, s := range node.Statements {
 			if err := c.Compile(s); err != nil {
 				return err
@@ -84,7 +81,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 		}
-
 	case *ast.ExpressionStatement:
 		if err := c.Compile(node.Expression); err != nil {
 			return err
@@ -286,10 +282,10 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		space := c.symbolTable.ComputeStack()
 
-		// space := c.symbolTable.StackSpace()
 		c.emitf("%s:", node.Name.Value)
 
 		if node.Signature.Parameter != nil {
+			const wordAllignment = 8
 			c.emitf("addi sp, sp, -%d", space)
 			switch node.Signature.Parameter.Type().Kind() {
 			case types.Float:
@@ -317,7 +313,6 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.emitf("ret")
 
 		c.stackSpace = 0
-		// c.symbolTable = c.symbolTable.Outer
 	case *ast.ReturnStatement:
 		if node.Value == nil {
 			// Clean up any stack space before jumping.
@@ -415,33 +410,36 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		node.Reg = reg
 	case *ast.SelectorExpression:
+		if err := c.Compile(node.X); err != nil {
+			return err
+		}
+
 		switch v := node.X.(type) {
 		case *ast.Identifier:
 			s, _ := c.symbolTable.Resolve(v.Value)
 			if s.Scope == symbol.GlobalScope {
-				if err := c.Compile(v); err != nil {
-					return err
-				}
-
 				c.emitf("ld %s, 0(%s)", v.Reg, v.Reg)
 				node.Reg = v.Reg
 			} else {
-				if err := c.Compile(v); err != nil {
-					return err
-				}
 				node.Reg = v.Reg
 			}
 		case *ast.CallExpression:
-			if err := c.Compile(v); err != nil {
-				return err
+			switch node.Field.T.Kind() {
+			case types.Float:
+				reg, err := c.registerTable.allocFloating()
+				if err != nil {
+					return err
+				}
+				c.emitf("fld %s, %d(a0)", reg, node.Offset)
+				node.Reg = reg
+			default:
+				reg, err := c.registerTable.allocGeneral()
+				if err != nil {
+					return err
+				}
+				c.emitf("ld %s, %d(a0)", reg, node.Offset)
+				node.Reg = reg
 			}
-
-			reg, err := c.registerTable.allocGeneral()
-			if err != nil {
-				return err
-			}
-			c.emitf("ld %s, %d(a0)", reg, node.Offset)
-			node.Reg = reg
 		default:
 			return fmt.Errorf("compiler error: SelectorExpression.X of type: %T is not implemented", v)
 		}
@@ -522,9 +520,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		node.Reg = reg
 		if node.Value {
-			c.emitf("li %s, 1", reg)
+			c.emitf("li %s, %d", reg, cTrue)
 		} else {
-			c.emitf("li %s, 0", reg)
+			c.emitf("li %s, %d", reg, cFalse)
 		}
 	default:
 		return fmt.Errorf("compiler error: unknown type: %#v", node)
@@ -755,8 +753,6 @@ func (c *Compiler) allocateRegByType(t types.Type) (string, error) {
 // identifier is a struct, then it also emits the instructions to allocate
 // space on the heap for it.
 func (c *Compiler) createASMLabelIdentifier(name string, t types.Type) error {
-	// TODO: This method could easily just emit the code instead of returning
-	// the string.
 	switch t.Kind() {
 	case types.Int, types.String, types.Bool, types.Func:
 		// string identifiers are treated as memory address of the actual

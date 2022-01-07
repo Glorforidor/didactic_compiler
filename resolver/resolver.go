@@ -51,6 +51,9 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if err := Resolve(node.Name, symbolTable); err != nil {
 			return err
 		}
+		if err := Resolve(node.Value, symbolTable); err != nil {
+			return err
+		}
 	case *ast.IfStatement:
 		if err := Resolve(node.Condition, symbolTable); err != nil {
 			return err
@@ -86,30 +89,28 @@ func Resolve(node ast.Node, symbolTable *symbol.Table) error {
 		if !ok {
 			if _, err := symbolTable.DefineFunc(node.Name.Value, node.Signature); err != nil {
 				return err
-			} else {
-				funcPrototypes[node.Name.Value] = node.Body == nil
 			}
-		} else {
-			if !funcPrototypes[node.Name.Value] {
-				return fmt.Errorf("resolver: function: %q already defined", node.Name.Value)
-			}
-
-			funcPrototypes[node.Name.Value] = node.Body == nil
+		} else if !funcPrototypes[node.Name.Value] {
+			return fmt.Errorf("resolver: function: %q already defined", node.Name.Value)
+		} else if node.Body == nil && funcPrototypes[node.Name.Value] {
+			return fmt.Errorf("resolver: function: %q already prototyped", node.Name.Value)
 		}
+
+		funcPrototypes[node.Name.Value] = node.Body == nil
 
 		node.SymbolTable = symbol.NewEnclosedTable(symbolTable)
 
 		if node.Signature.Parameter != nil {
 			s, ok := node.SymbolTable.Resolve(node.Signature.Parameter.Value)
 			if ok && s.Scope == symbol.TypeScope {
-				node.SymbolTable.DefineInFunc(
+				node.SymbolTable.DefineFuncParameter(
 					node.Signature.Parameter.Value,
 					s.Type,
 				)
 			} else {
 				// Allow the parameter to over shadow a global variable of same
 				// name.
-				node.SymbolTable.DefineInFunc(
+				node.SymbolTable.DefineFuncParameter(
 					node.Signature.Parameter.Value,
 					node.Signature.Parameter.Tnode,
 				)

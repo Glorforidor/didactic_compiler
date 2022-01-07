@@ -11,13 +11,8 @@ const (
 	GlobalScope SymbolScope = iota
 	FuncScope
 	LocalScope
-
 	TypeScope
 )
-
-func (ss SymbolScope) String() string {
-	return [...]string{"Global", "Local"}[ss]
-}
 
 type Symbol struct {
 	Name        string      // The identifier name.
@@ -27,14 +22,6 @@ type Symbol struct {
 	stackPoint  int         // Where the symbol resides on the stack.
 	stackOffset int         // stackOffset is used for referencing variables from the previous scope
 }
-
-func (s *Symbol) String() string {
-	return fmt.Sprintf("Name: %s, Type: %T", s.Name, s.Type)
-}
-
-// variablesSize is the byte size of a variable. As we target RV64 then it is 8
-// bytes.
-const variableSize = 8
 
 func (s *Symbol) Code() interface{} {
 	// Code returns the assembly code for the symbol.
@@ -52,12 +39,10 @@ func (s *Symbol) Code() interface{} {
 
 type Table struct {
 	Outer *Table
-
 	store map[string]*Symbol
 
 	numDefinitions int
-
-	stackSpace int
+	stackSpace     int
 }
 
 func (st *Table) String() string {
@@ -102,9 +87,9 @@ func (st *Table) DefineFunc(name string, t interface{}) (*Symbol, error) {
 	return s, nil
 }
 
-// DefineInFunc is used for defining the function parameter. Which will always
+// DefineFuncParameter is used for defining the function parameter. Which will always
 // have the local scope.
-func (st *Table) DefineInFunc(name string, t interface{}) *Symbol {
+func (st *Table) DefineFuncParameter(name string, t interface{}) *Symbol {
 	s := &Symbol{Name: name, Type: t, which: st.numDefinitions, Scope: LocalScope}
 	st.store[name] = s
 	st.numDefinitions++
@@ -147,6 +132,10 @@ func (st *Table) ComputeStack() int {
 	sort.Slice(keys, func(i, j int) bool {
 		return st.store[keys[i]].which < st.store[keys[j]].which
 	})
+
+	// variablesSize is the byte size of a variable. As we target RV64 then it is 8
+	// bytes.
+	const variableSize = 8
 
 	// The first element on the stack is always at 8(sp). Writing to 0(sp)
 	// should always be safe and should never overwrite other data.

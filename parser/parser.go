@@ -116,9 +116,11 @@ func (p *Parser) expectPeek(ts ...token.TokenType) bool {
 	}
 
 	if len(ts) == 1 {
-		p.errorf("expected next token to be %q, got: %q", ts, p.peekToken)
+		p.expectError("'" + string(ts[0]) + "'")
+		// p.errorf("expected next token to be %q, got: %q", ts, p.peekToken)
 	} else {
-		p.errorf("expected next token to be one of %q, got: %q", ts, p.peekToken)
+		p.expectError("'" + string(ts[0]) + "'")
+		// p.errorf("expected next token to be one of %q, got: %q", ts, p.peekToken)
 	}
 
 	return false
@@ -134,6 +136,22 @@ func (p *Parser) registerInfixFunc(tt token.TokenType, f infixParseFunc) {
 
 func (p *Parser) Errors() []string {
 	return p.errors
+}
+
+func (p *Parser) error(msg string) {
+	e := fmt.Sprintf("%d:%d: %s", p.curToken.Position.Row, p.curToken.Position.Col, msg)
+	p.errors = append(p.errors, e)
+}
+
+func (p *Parser) expectError(msg string) {
+	msg = fmt.Sprintf(
+		"%d:%d: %s",
+		p.curToken.Position.Row,
+		p.curToken.Position.Col,
+		"expected: "+msg,
+	)
+	msg += ", got: " + "'" + string(p.peekToken.Literal+"'")
+	p.errors = append(p.errors, msg)
 }
 
 func (p *Parser) errorf(format string, a ...interface{}) {
@@ -162,7 +180,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parsePrintStatement()
 	case token.Var:
 		v := p.parseVarStatement()
-		if !p.expectSemi() {
+		if v != nil && !p.expectSemi() {
 			return nil
 		}
 
@@ -171,7 +189,7 @@ func (p *Parser) parseStatement() ast.Statement {
 		return p.parseTypeStatement()
 	case token.Lbrace:
 		block := p.parseBlockStatement()
-		if !p.expectSemi() {
+		if block != nil && !p.expectSemi() {
 			return nil
 		}
 		return block
@@ -216,7 +234,10 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 
 	id := &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
-	p.nextToken() // advance to type
+	if !p.expectPeek(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident, token.Func) {
+		return nil
+	}
+	// p.nextToken() // advance to type
 
 	if p.curTokenIs(token.IntType, token.FloatType, token.StringType, token.BoolType, token.Ident) {
 		id.Tnode = &ast.BasicType{Token: p.curToken}
@@ -228,7 +249,7 @@ func (p *Parser) parseVarStatement() *ast.VarStatement {
 		ft := p.parseFuncType()
 		id.Tnode = ft
 	} else {
-		p.errorf("unexpected token: %q", p.curToken)
+		p.error("expected a type, got: " + "'" + string(p.curToken.Type) + "'")
 		return nil
 	}
 
@@ -569,7 +590,12 @@ func (p *Parser) parseExpressionOrAssignStatement() ast.Statement {
 
 	expr := p.parseExpression(Lowest)
 
+	if expr == nil {
+		return nil
+	}
+
 	if p.peekTokenIs(token.Assign) {
+		p.nextToken() // advance to the "="
 		stmt := &ast.AssignStatement{Name: expr}
 
 		p.nextToken() // advance to the "="

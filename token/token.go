@@ -65,8 +65,14 @@ const (
 
 // Token represents a lexical token.
 type Token struct {
-	Type    TokenType
-	Literal string
+	Type     TokenType
+	Literal  string
+	Position Position
+}
+
+type Position struct {
+	Row int
+	Col int
 }
 
 var keywords = map[string]TokenType{

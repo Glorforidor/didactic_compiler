@@ -14,13 +14,20 @@ type Lexer struct {
 
 	dontInsertSemi bool // used to skip semicolons in test
 	insertSemi     bool // insert semicolon on new line
+
+	line   int
+	column int
 }
 
 // TODO: copy Go's way of inserting semicolons on newline (which is basically
 // just create a token.Semicolon with the literal value of '\n')
 
 func New(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{
+		input:  input,
+		line:   1,
+		column: 0,
+	}
 	l.readChar()
 	return l
 }
@@ -39,8 +46,14 @@ func (l *Lexer) readChar() {
 		l.ch = l.input[l.readPosition]
 	}
 
+	if l.ch == '\n' {
+		l.column = 0
+		l.line++
+	}
+
+	l.column++
 	l.position = l.readPosition
-	l.readPosition += 1
+	l.readPosition++
 }
 
 const (
@@ -48,16 +61,17 @@ const (
 	newline byte = '\n'
 )
 
-func newToken(tokenType token.TokenType, ch byte) token.Token {
-	return token.Token{Type: tokenType, Literal: string(ch)}
+func newToken(tokenType token.TokenType, ch byte, position token.Position) token.Token {
+	return token.Token{Type: tokenType, Literal: string(ch), Position: position}
 }
 
 func (l *Lexer) makeTwoCharToken(t token.TokenType) token.Token {
+	pos := token.Position{Row: l.line, Col: l.column}
 	ch := l.ch
 	l.readChar()
 	literal := string(ch) + string(l.ch)
 
-	return token.Token{Type: t, Literal: literal}
+	return token.Token{Type: t, Literal: literal, Position: pos}
 }
 
 func (l *Lexer) NextToken() token.Token {
@@ -69,21 +83,22 @@ func (l *Lexer) NextToken() token.Token {
 
 	var insertSemi bool
 
+	position := token.Position{Row: l.line, Col: l.column}
 	var tok token.Token
 	switch l.ch {
 	case newline:
 		// We reach here, if l.insertSemi was true so l.skipWhiteSpace did not
 		// skip the newline.
 		l.insertSemi = false
-		tok = newToken(token.Semicolon, l.ch)
+		tok = newToken(token.Semicolon, l.ch, position)
 	case '+':
-		tok = newToken(token.Plus, l.ch)
+		tok = newToken(token.Plus, l.ch, position)
 	case '-':
-		tok = newToken(token.Minus, l.ch)
+		tok = newToken(token.Minus, l.ch, position)
 	case '*':
-		tok = newToken(token.Asterisk, l.ch)
+		tok = newToken(token.Asterisk, l.ch, position)
 	case '/':
-		tok = newToken(token.Slash, l.ch)
+		tok = newToken(token.Slash, l.ch, position)
 	case '!':
 		if l.peek() == '=' {
 			tok = l.makeTwoCharToken(token.NotEqual)
@@ -92,38 +107,39 @@ func (l *Lexer) NextToken() token.Token {
 		if l.peek() == '=' {
 			tok = l.makeTwoCharToken(token.Equal)
 		} else {
-			tok = newToken(token.Assign, l.ch)
+			tok = newToken(token.Assign, l.ch, position)
 		}
 	case '<':
-		tok = newToken(token.LessThan, l.ch)
+		tok = newToken(token.LessThan, l.ch, position)
 	case '(':
-		tok = newToken(token.Lparen, l.ch)
+		tok = newToken(token.Lparen, l.ch, position)
 	case ')':
-		tok = newToken(token.Rparen, l.ch)
+		tok = newToken(token.Rparen, l.ch, position)
 		insertSemi = true
 	case '{':
-		tok = newToken(token.Lbrace, l.ch)
+		tok = newToken(token.Lbrace, l.ch, position)
 	case '}':
-		tok = newToken(token.Rbrace, l.ch)
+		tok = newToken(token.Rbrace, l.ch, position)
 		insertSemi = true
 	case ';':
-		tok = newToken(token.Semicolon, l.ch)
+		tok = newToken(token.Semicolon, l.ch, position)
 	case '"':
 		tok.Type = token.String
 		tok.Literal = l.readString()
 		insertSemi = true
 	case '.':
-		tok = newToken(token.Period, l.ch)
+		tok = newToken(token.Period, l.ch, position)
 	case eof:
 		if l.insertSemi {
 			l.insertSemi = false
-			return newToken(token.Semicolon, '\n')
+			return newToken(token.Semicolon, '\n', position)
 		}
 
 		tok.Type = token.Eof
 		tok.Literal = ""
 	default:
 		if isLetter(l.ch) {
+			tok.Position = position
 			tok.Literal = l.readIdentifier()
 			tok.Type = token.LookupIdentifier(tok.Literal)
 
@@ -136,6 +152,7 @@ func (l *Lexer) NextToken() token.Token {
 			// return early so we do not advance further.
 			return tok
 		} else if isDigit(l.ch) {
+			tok.Position = position
 			tok = l.readNumber()
 
 			insertSemi = true
@@ -147,7 +164,7 @@ func (l *Lexer) NextToken() token.Token {
 			// return early so we do not advance further.
 			return tok
 		} else {
-			tok = token.Token{Type: token.Illegal, Literal: string(l.ch)}
+			tok = token.Token{Type: token.Illegal, Literal: string(l.ch), Position: position}
 		}
 	}
 
@@ -200,6 +217,7 @@ func (l *Lexer) readIdentifier() string {
 func (l *Lexer) readNumber() token.Token {
 	var tok token.Token
 	tok.Type = token.Int
+	tok.Position = token.Position{Row: l.line, Col: l.column}
 
 	position := l.position
 

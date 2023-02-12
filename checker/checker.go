@@ -75,7 +75,7 @@ func check(node ast.Node, symbolTable *symbol.Table) error {
 			case *ast.BasicType:
 				// In struct only allow for basic types
 				if t.Token.Type == token.Ident {
-					return fmt.Errorf("type error: struct fields can only be a basic type [int, float, bool, string].")
+					return fmt.Errorf("type error: struct fields can only be a basic type [int, float, bool, string]")
 				}
 				f.T = typeNodetoType(t)
 			default:
@@ -434,7 +434,7 @@ func tokenToType(t token.Token) types.Type {
 	case token.BoolType:
 		typ = types.Typ[types.Bool]
 	default:
-		panic(fmt.Sprintf("tokenToType can not handle this token type: %s", t))
+		panic(fmt.Sprintf("tokenToType can not handle this token type: %v", t))
 	}
 
 	return typ

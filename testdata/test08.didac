@@ -1,0 +1,25 @@
+if true {
+    print 1
+} else {
+    print 0
+}
+
+for var i int; i < 5; i = i + 1 {
+    type human struct{age int}
+    var x human
+    x.age = i
+    print i
+    print "\n"
+}
+
+func test1(x int) {
+    print x
+    print "\n"
+}
+
+func test2(x func(int)) {
+    var t int = 100
+    x(t)
+}
+
+test2(test1)

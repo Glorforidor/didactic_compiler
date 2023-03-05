@@ -1,0 +1,23 @@
+var x func(int)
+
+func test(int)
+func test2(int) int
+
+x = test
+
+x(100)
+
+func test(x int) {
+    var y func(int) int
+    y = test2
+    y(x)
+    test2(x)
+}
+
+func test2(x int) int {
+    if x == 0 {
+        return 1
+    }
+    print x
+    return test2(x-1)
+}

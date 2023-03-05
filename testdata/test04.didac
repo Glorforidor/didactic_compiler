@@ -1,0 +1,25 @@
+func fibo(x int) {
+    if x < 2 {
+        print x
+        print "\n"
+        return
+    }
+
+    var num1 int = 0
+    print num1
+    print " "
+    var num2 int = 1
+    print num2
+    print " "
+    for var i int = 2; i < x; i = i + 1 {
+        var sum int = num1 + num2
+        print sum
+        print " "
+        num1 = num2
+        num2 = sum
+    }
+
+    print "\n"
+}
+
+fibo(10)

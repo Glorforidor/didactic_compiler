@@ -1,0 +1,49 @@
+type human struct { age float; name string; height int }
+var x human
+x.age = 2.0
+x.name = "Peter"
+x.height = 186
+
+func testHuman(x human) {
+    print x.age
+}
+
+testHuman(x)
+
+var hello string = "Hello\n"
+
+func test() string {
+    return hello
+}
+
+func t(x func() string) {
+    print x()
+}
+
+func test2() {
+    print hello
+}
+
+func tt(x func()) {
+    x()
+}
+
+func ttt() human {
+    print "I am being called! "
+    var myTT human
+    myTT.age = 2.0
+    myTT.name = "Peter"
+    myTT.height = 186
+    return myTT
+}
+
+t(test)
+tt(test2)
+print ttt().age
+print "\n"
+print ttt().name
+print "\n"
+print ttt().height
+print "\n"
+
+print (2 + 3) * 3 + (2 - 4)

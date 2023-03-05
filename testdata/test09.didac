@@ -1,0 +1,30 @@
+type human struct { age int; name string }
+
+func printHuman(h human) {
+    print h.age
+    print "\n"
+    print h.name
+    print "\n"
+}
+
+var myPrintHuman func(human) = printHuman
+
+func main() {
+    var h human
+    h.age = 1
+    h.name = "Bob"
+    myPrintHuman(h)
+}
+
+func test(int) {
+    print _
+}
+
+var x int = 20
+
+main()
+test(x)
+
+for var i int = 0; true; i = i + 1 {
+    print i
+}

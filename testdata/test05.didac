@@ -1,0 +1,108 @@
+func incrementer(x int) int {
+    return x + 1
+}
+
+func decrementer(x int) int {
+    return x - 1
+}
+
+func getFunc(x int) func(int) int {
+    if x == 1 {
+        return incrementer
+    }
+
+    return decrementer
+}
+
+var x func(int) int
+x = getFunc(0)
+var y int = x(10)
+print y
+print "\n"
+
+func callOuterVariable() {
+    print x(10)
+    print "\n"
+}
+
+callOuterVariable()
+
+func fibo(x int) {
+    if x < 2 {
+        print x
+        print "\n"
+        return
+    }
+
+    var num1 int = 0
+    print num1
+    print " "
+    var num2 int = 1
+    print num2
+    print " "
+    for var i int = 2; i < x; i = i + 1 {
+        var sum int = num1 + num2
+        print sum
+        print " "
+        num1 = num2
+        num2 = sum
+    }
+
+    print "\n"
+}
+
+func fiboRec(x int) int {
+    if x < 2 {
+        return x
+    }
+
+    var n1 int
+    var n2 int
+
+    n1 = fiboRec(x - 1)
+    n2 =  fiboRec(x - 2)
+
+    return n1 + n2
+}
+
+func main() {
+    {
+        var mainX int = 20
+        fibo(0)
+        print "fibo(0) called\n"
+        fibo(1)
+        print "fibo(1) called\n"
+        fibo(15)
+        print "fibo(15) called\n"
+
+        {
+            var mainY int = mainX
+            fibo(20)
+            print "fibo(20) called\n"
+            fibo(25)
+            print "fibo(25) called\n"
+            fibo(30)
+            print "fibo(30) called\n"
+            fibo(40)
+            print "fibo(40) called\n"
+
+            print mainY
+            print "\nmainY above should be 20\n"
+
+            for var i int = 0; i < mainY; i = i + 1 {
+                fibo(i)
+                print "\n"
+            }
+        }
+    }
+}
+
+main()
+
+for var i int = 0; i < 15; i = i + 1 {
+    var fibs int = fiboRec(i)
+    print fibs
+    print " "
+}
+
+print fiboRec(15)

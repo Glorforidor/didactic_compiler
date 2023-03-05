@@ -1,0 +1,39 @@
+func incrementer(x int) int { return x + 1 }
+
+func decrementer(x int) int { return x - 1 }
+
+func getFunc(x int) func(int) int {
+    if x == 1 {
+        return incrementer
+    }
+
+    return decrementer
+}
+
+func loopy() {
+    for var i int = 0; i < 10; i = i + 1 {
+        print i
+        print "\n"
+    }
+}
+
+var inc func(int) int = getFunc(1)
+var dec func(int) int = getFunc(0)
+
+print inc(1)
+print "\n"
+print dec(1)
+print "\n"
+print inc(dec(1))
+print "\n"
+
+type human struct { age int; name string }
+
+var h human
+h.age = inc(1)
+h.name = "Compiler"
+
+print h.age
+print "\n"
+print h.name
+print "\n"

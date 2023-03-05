@@ -1,0 +1,60 @@
+type human struct { age int; name string; height float }
+func test() human
+func test2() human
+func test3(h human)
+
+var kkk human = test()
+
+kkk.age = 20
+
+print "kkk.name"
+print "\n"
+print kkk.name
+print "\n"
+print "test().name"
+print "\n"
+print test().name
+print "\n"
+
+test3(kkk)
+
+
+print "test3(test())\n"
+test3(test())
+print "\n"
+
+print "the end\n"
+
+func test() human {
+    return test2()
+}
+
+func test2() human {
+    var y human
+    y.name = "Peter"
+    y.height = 186.0
+
+    var i int
+    for i = 0; i < 30; i = i + 1 { }
+    y.age = i
+
+    test3(y)
+
+    return y
+}
+
+func test3(h human) {
+   print h.name
+   print "\n"
+   print h.age
+   print "\n"
+   print h.height
+   print "\n"
+}
+
+func test4(x int) {
+    print x
+}
+
+var myX int = 100
+test4(myX)

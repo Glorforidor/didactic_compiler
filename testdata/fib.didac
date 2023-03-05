@@ -1,0 +1,19 @@
+func fibo(x int) int
+
+print fibo(1)
+
+func fibo(x int) int {
+    if x < 2 {
+        return x
+    }
+    var n1 int = 0
+    var n2 int = 1
+    var n3 int
+    for var y int = 2; y < x; y = y + 1 {
+        n3 = n1 + n2
+        n1 = n2
+        n2 = n3
+    }
+
+    return n3
+}

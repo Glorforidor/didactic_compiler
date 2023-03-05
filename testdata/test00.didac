@@ -1,0 +1,228 @@
+print "above is amazing"
+print "\n"
+
+var x int
+x = 10
+
+print x + x * x / x - x
+print "\n"
+
+var y float
+var z float = 30.0
+y = 20.0
+
+var t float = 40.0
+t = t + 2.0
+print t
+print "\n"
+
+print z + y
+print "\n"
+
+print (2.0 + 8.0) / 4.0 * 16.0 - 1.0
+print "\n"
+
+var mystr string = "Hello World"
+var mystr2 string = mystr
+
+print mystr2
+print "\n"
+
+mystr = "Hello Compiler World"
+
+print mystr
+print "\n"
+print mystr2
+print "\n"
+
+{
+    print "Entering block 1"
+    print "\n"
+
+    var z5 int
+    var z6 int
+    var z7 int
+
+    print x + 2
+    print "\n"
+
+    var y1 int = 2
+    var x1 float = 2.0
+    {
+        print "Entering block 2"
+        print "\n"
+
+        print x
+        print "\n"
+        var x2 float = x1
+        print x2
+        print "\n"
+        var y2 int = 2
+        var y3 int = y2
+        print y3
+        print "\n"
+
+        var z11 int
+        var z21 int
+        var z31 int
+        var z41 int
+        var z51 int
+        var z61 int
+        var z71 int
+
+        {
+            print "Entering block 3"
+            print "\n"
+
+            var z111 int
+            var z211 int
+            var z311 int
+            var z411 int
+
+            var x3 int = x
+            print x3
+            print "\n"
+            var y4 int = y3
+            print y4
+            print "\n"
+            print "Above should print y4 which have the value 2 from previous scope"
+            print "\n"
+
+
+            var x4 float = x1
+            x4 = x4 + 8.0 + y
+            print x4
+            print "\n"
+            print "Above should add x1 from block 1 with 8.0 and y from global"
+            print "\n"
+
+            y3 = 10
+
+            print "Leaving block 3"
+            print "\n"
+        }
+
+        print y3
+        print "\n"
+        print "Inner block changed the value of y3 so above should print 10"
+        print "\n"
+
+        print "Leaving block 2"
+        print "\n"
+    }
+
+    print x + y1
+    print "\n"
+
+    print "Leaving block 1"
+    print "\n"
+}
+
+if (2 * 1) < (8 / 2) {
+    print x
+    print "\n"
+}
+
+var mytest bool = false
+mytest = true
+
+if mytest {
+    var mads string = "Mads is a sexy beast"
+    print mads
+    print "\n"
+} else {
+    if 1 < 2 {
+        var mads string = "Mads is not a sexy beast"
+        print mads
+        print "\n"
+    }
+}
+
+var ii int
+for ii = 0; ii < 11 + 1; ii = ii + 1 {
+    if ii < 6 {
+        print ii * 10
+        print "\n"
+    } else {
+        print "ii is so large!"
+        print "\n"
+    }
+}
+
+for var i int = 0; i < 10; i = i + 2 {
+    print i
+    print "\n"
+}
+
+print ii
+print "\n"
+
+print "----------------------------------------------------------------\n"
+
+type human struct {
+    age int
+    name string
+    height float
+}
+
+func test() human
+func test2() human
+func test3(h human)
+
+var kkk human = test()
+
+kkk.age = 20
+
+print "kkk.name"
+print "\n"
+print kkk.name
+print "\n"
+print "test().name"
+print "\n"
+print test().name
+print "\n"
+
+test3(kkk)
+
+print "test3(test())\n"
+test3(test())
+print "\n"
+
+func test() human {
+    return test2()
+}
+
+func test2() human {
+    var test2Y human
+    test2Y.name = "Peter"
+    test2Y.height = 186.0
+
+    var i int
+    for i = 0; i < 30; i = i + 1 { }
+    test2Y.age = i
+
+    test3(test2Y)
+
+    return test2Y
+}
+
+func test3(x human) {
+   print x.name
+   print "\n"
+   print x.age
+   print "\n"
+   print x.height
+   print "\n"
+}
+
+func test4(x int) {
+    print x
+    print "\n"
+}
+
+var myX int = 100
+test4(myX)
+
+print "End of program"
+print "\n"
+

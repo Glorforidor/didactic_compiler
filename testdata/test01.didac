@@ -1,0 +1,78 @@
+var x int
+x = 10
+print x + 5
+
+print x + x * x / x - x
+
+var y float
+var z float = 30.0
+y = 20.0
+
+var t float = 40.0
+t = t + 2.0
+print t
+
+print z + y
+
+print 2.0 + 8.0 / 4.0 * 16.0 - 1.0
+
+print (2.0 + 8.0) / 4.0 * 16.0 - 1.0
+
+print 2.0 + z * y / 10.0
+
+var s float
+s = z
+
+s = s + s
+
+s = (s + s) / 4.5
+
+print s
+print s + 2.52356
+
+var test float = 2.0 + 2.0
+
+print test
+
+var mystr string = "Hello World"
+var mystr2 string = mystr
+
+print mystr2
+
+mystr = "Hello Compiler World"
+
+print mystr
+print "\n"
+print mystr2
+print "\n"
+
+{
+    print x + 2
+    print "\n"
+
+    var yy int = 2
+    var xx float = 2.0
+    {
+        print xx
+        var xxx int = 1000000
+        {
+            print xxx
+            var heheh int = x
+            print xxx
+            print "\n"
+            print "Above should also yield 1000000"
+            print "\n"
+        }
+
+        print xxx
+        print "\n"
+
+        var yyy int = 16
+
+        print yyy
+        print "\n"
+    }
+
+    print x + yy
+    print "\n"
+}

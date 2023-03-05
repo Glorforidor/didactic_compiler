@@ -589,13 +589,11 @@ func (p *Parser) parseExpressionOrAssignStatement() ast.Statement {
 	tok := p.curToken
 
 	expr := p.parseExpression(Lowest)
-
 	if expr == nil {
 		return nil
 	}
 
 	if p.peekTokenIs(token.Assign) {
-		p.nextToken() // advance to the "="
 		stmt := &ast.AssignStatement{Name: expr}
 
 		p.nextToken() // advance to the "="

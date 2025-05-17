@@ -1,7 +1,6 @@
 package checker
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -993,7 +992,7 @@ func runCheckerTests(t *testing.T, tests []checkerTest) {
 						tt.expectedType, node.T)
 				}
 			default:
-				t.Fatalf(fmt.Sprintf("unhandled type: %T", node))
+				t.Fatalf("unhandled type: %T", node)
 			}
 		}
 
